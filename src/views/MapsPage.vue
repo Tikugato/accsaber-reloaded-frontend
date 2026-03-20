@@ -206,7 +206,7 @@ async function fetchDifficulties() {
   loading.value = true
   try {
     const { getDifficulties } = await import('@/api/maps')
-    const params: Record<string, unknown> = { ...paginationParams.value }
+    const params: Record<string, unknown> = { ...paginationParams.value, status: 'RANKED' }
     if (selectedCategories.value.length === 1) {
       params.categoryId = selectedCategories.value[0]
     }
