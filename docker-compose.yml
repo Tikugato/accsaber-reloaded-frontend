@@ -8,8 +8,6 @@ services:
         VITE_RANKING_URL: ${VITE_RANKING_URL}
     container_name: accsaber-frontend
     restart: unless-stopped
-    ports:
-      - "80:80"
     environment:
       - API_PROXY_TARGET=${API_PROXY_TARGET}
     healthcheck:
