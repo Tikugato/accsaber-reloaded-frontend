@@ -148,6 +148,9 @@ function navigateToPlayer(steamId: string) {
       <p class="home-footer__text">
         Logo by Brylanbbab and Interz. AccSaber Reloaded takes no credit for any assets used in their platform.
       </p>
+      <a href="https://github.com/tikugato/accsaber-reloaded-frontend" target="_blank" rel="noopener noreferrer" class="home-footer__link">
+        GitHub
+      </a>
     </footer>
   </div>
 </template>
@@ -370,6 +373,18 @@ function navigateToPlayer(steamId: string) {
   color: var(--text-tertiary);
   margin: 0;
   line-height: 1.5;
+}
+
+.home-footer__link {
+  font-size: var(--text-caption);
+  color: var(--text-tertiary);
+  margin-top: var(--space-sm);
+  display: inline-block;
+  text-decoration: none;
+}
+
+.home-footer__link:hover {
+  color: var(--text-secondary);
 }
 
 @media (max-width: 767px) {
