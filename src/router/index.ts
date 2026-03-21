@@ -110,6 +110,10 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  if (to.path === '/' && window.location.hostname.startsWith('admin.')) {
+    return { name: 'admin' }
+  }
+
   if (to.meta.requiresStaff) {
     const auth = useAuthStore()
 
