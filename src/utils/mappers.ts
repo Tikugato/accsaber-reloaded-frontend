@@ -1,7 +1,7 @@
 import type { MapDifficultyResponse } from '@/types/api/maps'
 import type { MilestoneCompletionResponse } from '@/types/api/milestones'
-import type { LeaderboardResponse, ScoreResponse, UserMilestoneProgressResponse } from '@/types/api/users'
-import type { CategoryCode, DifficultyScoreDisplay, MapDisplay, MilestoneDisplay, PlayerDisplay, ScoreDisplay } from '@/types/display'
+import type { LeaderboardResponse, ScoreResponse, UserMilestoneProgressResponse, XpLeaderboardResponse } from '@/types/api/users'
+import type { CategoryCode, DifficultyScoreDisplay, MapDisplay, MilestoneDisplay, PlayerDisplay, ScoreDisplay, XpPlayerDisplay } from '@/types/display'
 
 export function formatDifficulty(diff: string): string {
   switch (diff) {
@@ -25,6 +25,18 @@ export function toPlayerDisplay(entry: LeaderboardResponse): PlayerDisplay {
     ap: entry.ap,
     avgAccuracy: entry.averageAcc,
     rankedPlays: entry.rankedPlays,
+  }
+}
+
+export function toXpPlayerDisplay(entry: XpLeaderboardResponse): XpPlayerDisplay {
+  return {
+    userId: entry.userId,
+    name: entry.userName,
+    country: entry.country,
+    avatarUrl: entry.avatarUrl,
+    rank: entry.ranking,
+    totalXp: entry.totalXp,
+    level: entry.level,
   }
 }
 

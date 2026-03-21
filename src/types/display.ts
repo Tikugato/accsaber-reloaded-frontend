@@ -44,6 +44,16 @@ export interface PlayerDisplay {
   rankedPlays?: number
 }
 
+export interface XpPlayerDisplay {
+  userId: string
+  name: string
+  country: string
+  avatarUrl: string
+  rank: number
+  totalXp: number
+  level: number
+}
+
 export interface MapDisplay {
   id: string
   difficultyId: string

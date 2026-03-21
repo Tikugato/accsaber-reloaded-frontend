@@ -1,14 +1,14 @@
 import type { SortDirection, SortState } from '@/types/display'
 import type { PaginationParams } from '@/types/pagination'
-import { computed } from 'vue'
+import { type MaybeRefOrGetter, computed, toValue } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 export interface PageableRouteOptions {
-  defaultSort: string
+  defaultSort: MaybeRefOrGetter<string>
   defaultOrder?: SortDirection
   defaultSize?: number
   sortFieldMap?: Record<string, string>
-  secondarySort?: string | null
+  secondarySort?: MaybeRefOrGetter<string | null>
 }
 
 export function usePageableRoute(options: PageableRouteOptions) {
@@ -29,7 +29,7 @@ export function usePageableRoute(options: PageableRouteOptions) {
   })
 
   const sortState = computed<SortState>(() => {
-    const key = (route.query.sort as string) || defaultSort
+    const key = (route.query.sort as string) || toValue(defaultSort)
     const direction = (route.query.order as SortDirection) || defaultOrder
     return { key, direction }
   })
@@ -66,9 +66,10 @@ export function usePageableRoute(options: PageableRouteOptions) {
   const paginationParams = computed<PaginationParams>(() => {
     const apiField = sortFieldMap[sortState.value.key] ?? sortState.value.key
     const primarySort = `${apiField},${sortState.value.direction}`
-    const sort = (!secondarySort || primarySort.startsWith(secondarySort.split(',')[0]))
+    const secondary = toValue(secondarySort)
+    const sort = (!secondary || primarySort.startsWith(secondary.split(',')[0]))
       ? primarySort
-      : [primarySort, secondarySort]
+      : [primarySort, secondary]
     return {
       page: currentPage.value - 1,
       size: defaultSize,

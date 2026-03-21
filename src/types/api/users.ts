@@ -62,6 +62,16 @@ export interface LeaderboardResponse {
   topPlayId: string
 }
 
+export interface XpLeaderboardResponse {
+  ranking: number
+  userId: string
+  userName: string
+  country: string
+  avatarUrl: string
+  totalXp: number
+  level: number
+}
+
 export interface UserCategoryStatisticsResponse {
   id: string
   userId: string

@@ -9,11 +9,11 @@ import CountryFlag from '@/components/domain/CountryFlag.vue'
 import { usePageableRoute } from '@/composables/usePageableRoute'
 import { useAuthStore } from '@/stores/auth'
 import { useCategoryStore } from '@/stores/categories'
-import type { LeaderboardResponse } from '@/types/api/users'
-import type { CategoryCode, PlayerDisplay, TableColumn } from '@/types/display'
+import type { LeaderboardResponse, XpLeaderboardResponse } from '@/types/api/users'
+import type { CategoryCode, TableColumn } from '@/types/display'
 import type { Page } from '@/types/pagination'
 import { COUNTRY_OPTIONS } from '@/utils/countries'
-import { toPlayerDisplay } from '@/utils/mappers'
+import { toPlayerDisplay, toXpPlayerDisplay } from '@/utils/mappers'
 import { getRankClass } from '@/utils/ranking'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -23,26 +23,32 @@ const router = useRouter()
 const authStore = useAuthStore()
 const categoryStore = useCategoryStore()
 
-const { currentPage, sortState, paginationParams, setPage, setSort, resetPage } = usePageableRoute({
-  defaultSort: 'ap',
-  defaultOrder: 'desc',
-  defaultSize: 50,
-  sortFieldMap: { avgAccuracy: 'averageAcc' },
-})
-
 const activeCategory = computed<CategoryCode>({
   get: () => (route.params.categoryCode as CategoryCode) || 'overall',
   set: (code) => {
     const query = { ...route.query }
     delete query.page
+    delete query.sort
+    delete query.order
     router.push({ name: 'leaderboards-category', params: { categoryCode: code }, query })
   },
 })
 
+const isXpMode = computed(() => activeCategory.value === 'xp')
+
+const { currentPage, sortState, paginationParams, setPage, setSort, resetPage } = usePageableRoute({
+  defaultSort: computed(() => isXpMode.value ? 'totalXp' : 'ap'),
+  defaultOrder: 'desc',
+  defaultSize: 50,
+  sortFieldMap: { avgAccuracy: 'averageAcc' },
+  secondarySort: computed(() => isXpMode.value ? null : 'ap,desc'),
+})
+
 const accent = computed(() => categoryStore.getAccent(activeCategory.value))
-const categoryName = computed(() =>
-  categoryStore.getCategoryInfo(activeCategory.value)?.name ?? 'Leaderboards',
-)
+const categoryName = computed(() => {
+  if (isXpMode.value) return 'XP Leaderboard'
+  return categoryStore.getCategoryInfo(activeCategory.value)?.name ?? 'Leaderboards'
+})
 
 const countryFilter = computed<string>({
   get: () => (route.query.country as string) || '',
@@ -60,38 +66,63 @@ const countryFilter = computed<string>({
 
 const searchQuery = ref('')
 const loading = ref(false)
-const pageData = ref<Page<LeaderboardResponse> | null>(null)
+const apPageData = ref<Page<LeaderboardResponse> | null>(null)
+const xpPageData = ref<Page<XpLeaderboardResponse> | null>(null)
 const highlightedUserId = ref<string | null>(null)
 
-const players = computed<PlayerDisplay[]>(() => {
-  if (!pageData.value) return []
-  return pageData.value.content.map(toPlayerDisplay)
+const rows = computed(() => {
+  if (isXpMode.value) {
+    if (!xpPageData.value) return []
+    return xpPageData.value.content.map((entry) => {
+      const p = toXpPlayerDisplay(entry)
+      return {
+        rank: p.rank,
+        userId: p.userId,
+        name: p.name,
+        country: p.country,
+        avatarUrl: p.avatarUrl,
+        totalXp: p.totalXp,
+        level: p.level,
+      }
+    })
+  }
+  if (!apPageData.value) return []
+  return apPageData.value.content.map((entry) => {
+    const p = toPlayerDisplay(entry)
+    return {
+      rank: p.rank,
+      countryRank: p.countryRank,
+      userId: p.userId,
+      name: p.name,
+      country: p.country,
+      avatarUrl: p.avatarUrl,
+      ap: p.ap,
+      avgAccuracy: p.avgAccuracy,
+      rankedPlays: p.rankedPlays,
+    }
+  })
 })
 
-const rows = computed(() =>
-  players.value.map((p) => ({
-    rank: p.rank,
-    countryRank: p.countryRank,
-    userId: p.userId,
-    name: p.name,
-    country: p.country,
-    avatarUrl: p.avatarUrl,
-    ap: p.ap,
-    avgAccuracy: p.avgAccuracy,
-    rankedPlays: p.rankedPlays,
-  })),
-)
-
+const pageData = computed(() => isXpMode.value ? xpPageData.value : apPageData.value)
 const totalPages = computed(() => pageData.value?.totalPages ?? 0)
 const totalPlayers = computed(() => pageData.value?.totalElements ?? 0)
 
-const columns: TableColumn[] = [
+const apColumns: TableColumn[] = [
   { key: 'rank', label: 'Rank', align: 'right', mono: true, width: '80px' },
   { key: 'player', label: 'Player', align: 'left' },
   { key: 'ap', label: 'AP', sortable: true, align: 'right', mono: true, width: '120px' },
   { key: 'avgAccuracy', label: 'Avg Acc', sortable: true, align: 'right', mono: true, width: '120px' },
   { key: 'rankedPlays', label: 'Plays', sortable: true, align: 'right', mono: true, width: '100px' },
 ]
+
+const xpColumns: TableColumn[] = [
+  { key: 'rank', label: 'Rank', align: 'right', mono: true, width: '80px' },
+  { key: 'player', label: 'Player', align: 'left' },
+  { key: 'level', label: 'Level', sortable: true, align: 'right', mono: true, width: '100px' },
+  { key: 'totalXp', label: 'Total XP', sortable: true, align: 'right', mono: true, width: '140px' },
+]
+
+const columns = computed(() => isXpMode.value ? xpColumns : apColumns)
 
 const countryOptions = computed(() => {
   const userCountry = authStore.userProfile?.country
@@ -106,21 +137,33 @@ const countryOptions = computed(() => {
 })
 
 async function fetchData() {
-  const categoryId = categoryStore.getCategoryId(activeCategory.value)
-  if (!categoryId) return
-
   loading.value = true
   try {
-    const { getLeaderboard, getCountryLeaderboard } = await import('@/api/leaderboards')
-    const params = { ...paginationParams.value, search: searchQuery.value.trim() || undefined }
-
-    if (countryFilter.value) {
-      pageData.value = await getCountryLeaderboard(categoryId, countryFilter.value, params)
+    if (isXpMode.value) {
+      const { getXpLeaderboard } = await import('@/api/leaderboards')
+      const params = {
+        ...paginationParams.value,
+        search: searchQuery.value.trim() || undefined,
+        country: countryFilter.value || undefined,
+      }
+      xpPageData.value = await getXpLeaderboard(params)
     } else {
-      pageData.value = await getLeaderboard(categoryId, params)
+      const categoryId = categoryStore.getCategoryId(activeCategory.value)
+      if (!categoryId) {
+        loading.value = false
+        return
+      }
+      const { getLeaderboard, getCountryLeaderboard } = await import('@/api/leaderboards')
+      const params = { ...paginationParams.value, search: searchQuery.value.trim() || undefined }
+      if (countryFilter.value) {
+        apPageData.value = await getCountryLeaderboard(categoryId, countryFilter.value, params)
+      } else {
+        apPageData.value = await getLeaderboard(categoryId, params)
+      }
     }
   } catch {
-    pageData.value = null
+    apPageData.value = null
+    xpPageData.value = null
   }
   loading.value = false
 
@@ -194,10 +237,11 @@ watch(() => categoryStore.loaded, (loaded) => {
 
     <div class="leaderboards__table">
       <DataTable :columns="columns" :rows="rows" :sort-state="sortState" :loading="loading" :loading-rows="10"
-        :row-class="rowClass" row-clickable :row-to="playerRowTo" empty-message="No players found for this category"
-        @sort="setSort" @row-click="handleRowClick">
+        :row-class="rowClass" row-clickable :row-to="playerRowTo"
+        :empty-message="isXpMode ? 'No players found' : 'No players found for this category'" @sort="setSort"
+        @row-click="handleRowClick">
         <template #cell-rank="{ value, row }">
-          <span v-if="countryFilter && row.countryRank" class="rank-cell"
+          <span v-if="!isXpMode && countryFilter && row.countryRank" class="rank-cell"
             :class="getRankClass(row.countryRank as number)">
             #{{ row.countryRank }}
             <span class="rank-cell__global">(#{{ value }})</span>
@@ -226,6 +270,10 @@ watch(() => categoryStore.loaded, (loaded) => {
           <template v-else>-</template>
         </template>
 
+        <template #cell-totalXp="{ value }">
+          <span class="ap-cell">{{ (value as number).toLocaleString() }}</span>
+        </template>
+
         <template #mobile-card="{ row }">
           <router-link :to="{ name: 'player-profile', params: { userId: row.userId as string } }" class="lb-card"
             :class="[
@@ -234,15 +282,16 @@ watch(() => categoryStore.loaded, (loaded) => {
               rowClass(row)
             ]" :data-user-id="row.userId">
             <span class="lb-card__rank rank-cell"
-              :class="getRankClass(countryFilter && row.countryRank ? row.countryRank as number : row.rank as number)">
-              #{{ countryFilter && row.countryRank ? row.countryRank : row.rank }}
+              :class="getRankClass(!isXpMode && countryFilter && row.countryRank ? row.countryRank as number : row.rank as number)">
+              #{{ !isXpMode && countryFilter && row.countryRank ? row.countryRank : row.rank }}
             </span>
             <div class="lb-card__player">
               <GlowImage :src="(row.avatarUrl as string)" :alt="(row.name as string)" :size="28" />
               <span class="lb-card__name">{{ row.name }}</span>
               <CountryFlag :country="(row.country as string)" />
             </div>
-            <span class="lb-card__ap ap-cell">{{ (row.ap as number).toFixed(2) }}</span>
+            <span v-if="isXpMode" class="lb-card__ap ap-cell">{{ (row.totalXp as number).toLocaleString() }} XP</span>
+            <span v-else class="lb-card__ap ap-cell">{{ (row.ap as number).toFixed(2) }}</span>
           </router-link>
         </template>
       </DataTable>

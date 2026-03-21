@@ -10,6 +10,7 @@ const CATEGORY_COLORS: Record<string, { accent: string; tint: string; tintLight:
   tech_acc: { accent: '#ef4444', tint: '#3d1414', tintLight: '#fdd4d4' },
   low_mid: { accent: '#eab308', tint: '#3d3508', tintLight: '#faf0c8' },
   overall: { accent: '#a855f7', tint: '#2d1650', tintLight: '#ead4fd' },
+  xp: { accent: '#06b6d4', tint: '#0e3640', tintLight: '#ccf2f8' },
 }
 
 const DEFAULT_COLOR = { accent: '#a855f7', tint: '#2d1650', tintLight: '#ead4fd' }
@@ -34,8 +35,16 @@ export const useCategoryStore = defineStore('categories', () => {
     return map
   })
 
-  const categoryInfoList = computed<CategoryInfo[]>(() =>
-    categories.value.map((cat) => {
+  const XP_INFO: CategoryInfo = {
+    code: 'xp',
+    name: 'XP',
+    accent: CATEGORY_COLORS.xp.accent,
+    tint: CATEGORY_COLORS.xp.tint,
+    tintLight: CATEGORY_COLORS.xp.tintLight,
+  }
+
+  const categoryInfoList = computed<CategoryInfo[]>(() => {
+    const list = categories.value.map((cat) => {
       const colors = CATEGORY_COLORS[cat.code] ?? DEFAULT_COLOR
       return {
         code: cat.code,
@@ -44,8 +53,9 @@ export const useCategoryStore = defineStore('categories', () => {
         tint: colors.tint,
         tintLight: colors.tintLight,
       }
-    }),
-  )
+    })
+    return [...list, XP_INFO]
+  })
 
   const categoryInfoByCode = computed(() => {
     const map = new Map<string, CategoryInfo>()
