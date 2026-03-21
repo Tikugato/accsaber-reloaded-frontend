@@ -5,6 +5,7 @@ import type {
   LevelResponse,
   ScoreResponse,
   StatsDiffResponse,
+  UserAllStatisticsResponse,
   UserCategoryStatisticsResponse,
   UserMilestoneProgressResponse,
   UserResponse,
@@ -55,16 +56,10 @@ export function getUserOverallStatistics(
   return get<UserCategoryStatisticsResponse>(`/users/${userId}/statistics`)
 }
 
-export function getUserCategoryStatistics(
+export function getUserAllStatistics(
   userId: string,
-  category?: string,
-): Promise<UserCategoryStatisticsResponse[]> {
-  if (category) {
-    return get<UserCategoryStatisticsResponse[]>(
-      `/users/${userId}/statistics${buildQuery({ category })}`,
-    )
-  }
-  return get<UserCategoryStatisticsResponse[]>(`/users/${userId}/statistics/all`)
+): Promise<UserAllStatisticsResponse> {
+  return get<UserAllStatisticsResponse>(`/users/${userId}/statistics/all`)
 }
 
 export function getUserHistoricStatistics(

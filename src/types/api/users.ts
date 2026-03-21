@@ -6,6 +6,8 @@ export interface UserResponse {
   name: string
   avatarUrl: string
   country: string
+  xpRanking: number
+  xpCountryRanking: number
   createdAt: string
 }
 
@@ -51,6 +53,7 @@ export interface ScoreResponse {
 export interface LeaderboardResponse {
   ranking: number
   countryRanking: number
+  rankingLastWeek: number | null
   userId: string
   userName: string
   country: string
@@ -64,12 +67,22 @@ export interface LeaderboardResponse {
 
 export interface XpLeaderboardResponse {
   ranking: number
+  countryRanking: number
+  rankingLastWeek: number | null
   userId: string
   userName: string
   country: string
   avatarUrl: string
   totalXp: number
   level: number
+}
+
+export interface UserAllStatisticsResponse {
+  totalXp: number
+  totalScoreXp: number
+  totalMilestoneXp: number
+  totalMilestoneSetBonusXp: number
+  categories: UserCategoryStatisticsResponse[]
 }
 
 export interface UserCategoryStatisticsResponse {

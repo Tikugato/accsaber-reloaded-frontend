@@ -7,9 +7,9 @@ import { computed } from 'vue'
 
 const props = withDefaults(defineProps<{
   modelValue: CategoryCode
-  excludeOverall?: boolean
+  exclude?: CategoryCode[]
 }>(), {
-  excludeOverall: false,
+  exclude: () => [],
 })
 
 const emit = defineEmits<{
@@ -24,8 +24,8 @@ const tabs = computed(() => {
     ...all.filter((c) => c.code === 'overall'),
     ...all.filter((c) => c.code !== 'overall'),
   ]
-  const list = props.excludeOverall
-    ? sorted.filter((c) => c.code !== 'overall')
+  const list = props.exclude.length > 0
+    ? sorted.filter((c) => !props.exclude.includes(c.code))
     : sorted
   return list.map((c) => ({
     key: c.code,

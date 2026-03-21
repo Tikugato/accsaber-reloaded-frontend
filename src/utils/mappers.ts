@@ -22,6 +22,7 @@ export function toPlayerDisplay(entry: LeaderboardResponse): PlayerDisplay {
     avatarUrl: entry.avatarUrl,
     rank: entry.ranking,
     countryRank: entry.countryRanking,
+    rankChange: entry.rankingLastWeek != null ? entry.rankingLastWeek - entry.ranking : null,
     ap: entry.ap,
     avgAccuracy: entry.averageAcc,
     rankedPlays: entry.rankedPlays,
@@ -35,6 +36,8 @@ export function toXpPlayerDisplay(entry: XpLeaderboardResponse): XpPlayerDisplay
     country: entry.country,
     avatarUrl: entry.avatarUrl,
     rank: entry.ranking,
+    countryRank: entry.countryRanking,
+    rankChange: entry.rankingLastWeek != null ? entry.rankingLastWeek - entry.ranking : null,
     totalXp: entry.totalXp,
     level: entry.level,
   }

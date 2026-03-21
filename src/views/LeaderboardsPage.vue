@@ -3,6 +3,7 @@ import BaseSelect from '@/components/common/BaseSelect.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import GlowImage from '@/components/common/GlowImage.vue'
 import PaginationControls from '@/components/common/PaginationControls.vue'
+import RankChange from '@/components/common/RankChange.vue'
 import SearchBox from '@/components/common/SearchBox.vue'
 import CategoryTabs from '@/components/domain/CategoryTabs.vue'
 import CountryFlag from '@/components/domain/CountryFlag.vue'
@@ -45,10 +46,9 @@ const { currentPage, sortState, paginationParams, setPage, setSort, resetPage } 
 })
 
 const accent = computed(() => categoryStore.getAccent(activeCategory.value))
-const categoryName = computed(() => {
-  if (isXpMode.value) return 'XP Leaderboard'
-  return categoryStore.getCategoryInfo(activeCategory.value)?.name ?? 'Leaderboards'
-})
+const categoryName = computed(() =>
+  categoryStore.getCategoryInfo(activeCategory.value)?.name ?? 'Leaderboards',
+)
 
 const countryFilter = computed<string>({
   get: () => (route.query.country as string) || '',
@@ -77,6 +77,8 @@ const rows = computed(() => {
       const p = toXpPlayerDisplay(entry)
       return {
         rank: p.rank,
+        countryRank: p.countryRank,
+        rankChange: p.rankChange,
         userId: p.userId,
         name: p.name,
         country: p.country,
@@ -92,6 +94,7 @@ const rows = computed(() => {
     return {
       rank: p.rank,
       countryRank: p.countryRank,
+      rankChange: p.rankChange,
       userId: p.userId,
       name: p.name,
       country: p.country,
@@ -107,12 +110,15 @@ const pageData = computed(() => isXpMode.value ? xpPageData.value : apPageData.v
 const totalPages = computed(() => pageData.value?.totalPages ?? 0)
 const totalPlayers = computed(() => pageData.value?.totalElements ?? 0)
 
+const rankChangeColumn: TableColumn = { key: 'rankChange', label: '', align: 'center', width: '70px' }
+
 const apColumns: TableColumn[] = [
   { key: 'rank', label: 'Rank', align: 'right', mono: true, width: '80px' },
   { key: 'player', label: 'Player', align: 'left' },
   { key: 'ap', label: 'AP', sortable: true, align: 'right', mono: true, width: '120px' },
   { key: 'avgAccuracy', label: 'Avg Acc', sortable: true, align: 'right', mono: true, width: '120px' },
   { key: 'rankedPlays', label: 'Plays', sortable: true, align: 'right', mono: true, width: '100px' },
+  rankChangeColumn,
 ]
 
 const xpColumns: TableColumn[] = [
@@ -120,6 +126,7 @@ const xpColumns: TableColumn[] = [
   { key: 'player', label: 'Player', align: 'left' },
   { key: 'level', label: 'Level', sortable: true, align: 'right', mono: true, width: '100px' },
   { key: 'totalXp', label: 'Total XP', sortable: true, align: 'right', mono: true, width: '140px' },
+  rankChangeColumn,
 ]
 
 const columns = computed(() => isXpMode.value ? xpColumns : apColumns)
@@ -162,8 +169,11 @@ async function fetchData() {
       }
     }
   } catch {
-    apPageData.value = null
-    xpPageData.value = null
+    if (isXpMode.value) {
+      xpPageData.value = null
+    } else {
+      apPageData.value = null
+    }
   }
   loading.value = false
 
@@ -238,10 +248,10 @@ watch(() => categoryStore.loaded, (loaded) => {
     <div class="leaderboards__table">
       <DataTable :columns="columns" :rows="rows" :sort-state="sortState" :loading="loading" :loading-rows="10"
         :row-class="rowClass" row-clickable :row-to="playerRowTo"
-        :empty-message="isXpMode ? 'No players found' : 'No players found for this category'" @sort="setSort"
+        empty-message="No players found" @sort="setSort"
         @row-click="handleRowClick">
         <template #cell-rank="{ value, row }">
-          <span v-if="!isXpMode && countryFilter && row.countryRank" class="rank-cell"
+          <span v-if="countryFilter && row.countryRank" class="rank-cell"
             :class="getRankClass(row.countryRank as number)">
             #{{ row.countryRank }}
             <span class="rank-cell__global">(#{{ value }})</span>
@@ -249,6 +259,10 @@ watch(() => categoryStore.loaded, (loaded) => {
           <span v-else class="rank-cell" :class="getRankClass(value as number)">
             #{{ value }}
           </span>
+        </template>
+
+        <template #cell-rankChange="{ row }">
+          <RankChange :value="(row.rankChange as number) ?? 0" />
         </template>
 
         <template #cell-player="{ row }">
@@ -271,7 +285,7 @@ watch(() => categoryStore.loaded, (loaded) => {
         </template>
 
         <template #cell-totalXp="{ value }">
-          <span class="ap-cell">{{ (value as number).toLocaleString() }}</span>
+          <span class="ap-cell">{{ Math.round(value as number).toLocaleString() }}</span>
         </template>
 
         <template #mobile-card="{ row }">
@@ -282,15 +296,16 @@ watch(() => categoryStore.loaded, (loaded) => {
               rowClass(row)
             ]" :data-user-id="row.userId">
             <span class="lb-card__rank rank-cell"
-              :class="getRankClass(!isXpMode && countryFilter && row.countryRank ? row.countryRank as number : row.rank as number)">
-              #{{ !isXpMode && countryFilter && row.countryRank ? row.countryRank : row.rank }}
+              :class="getRankClass(countryFilter && row.countryRank ? row.countryRank as number : row.rank as number)">
+              #{{ countryFilter && row.countryRank ? row.countryRank : row.rank }}
             </span>
             <div class="lb-card__player">
               <GlowImage :src="(row.avatarUrl as string)" :alt="(row.name as string)" :size="28" />
               <span class="lb-card__name">{{ row.name }}</span>
               <CountryFlag :country="(row.country as string)" />
             </div>
-            <span v-if="isXpMode" class="lb-card__ap ap-cell">{{ (row.totalXp as number).toLocaleString() }} XP</span>
+            <RankChange :value="(row.rankChange as number) ?? 0" class="lb-card__change" />
+            <span v-if="isXpMode" class="lb-card__ap ap-cell">{{ Math.round(row.totalXp as number).toLocaleString() }} XP</span>
             <span v-else class="lb-card__ap ap-cell">{{ (row.ap as number).toFixed(2) }}</span>
           </router-link>
         </template>

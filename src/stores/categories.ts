@@ -15,6 +15,14 @@ const CATEGORY_COLORS: Record<string, { accent: string; tint: string; tintLight:
 
 const DEFAULT_COLOR = { accent: '#a855f7', tint: '#2d1650', tintLight: '#ead4fd' }
 
+const XP_INFO: CategoryInfo = {
+  code: 'xp',
+  name: 'XP',
+  accent: CATEGORY_COLORS.xp.accent,
+  tint: CATEGORY_COLORS.xp.tint,
+  tintLight: CATEGORY_COLORS.xp.tintLight,
+}
+
 export const useCategoryStore = defineStore('categories', () => {
   const categories = ref<CategoryResponse[]>([])
   const loaded = ref(false)
@@ -34,14 +42,6 @@ export const useCategoryStore = defineStore('categories', () => {
     }
     return map
   })
-
-  const XP_INFO: CategoryInfo = {
-    code: 'xp',
-    name: 'XP',
-    accent: CATEGORY_COLORS.xp.accent,
-    tint: CATEGORY_COLORS.xp.tint,
-    tintLight: CATEGORY_COLORS.xp.tintLight,
-  }
 
   const categoryInfoList = computed<CategoryInfo[]>(() => {
     const list = categories.value.map((cat) => {

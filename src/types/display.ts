@@ -39,6 +39,7 @@ export interface PlayerDisplay {
   avatarUrl: string
   rank: number
   countryRank?: number
+  rankChange?: number | null
   ap: number
   avgAccuracy?: number
   rankedPlays?: number
@@ -50,6 +51,8 @@ export interface XpPlayerDisplay {
   country: string
   avatarUrl: string
   rank: number
+  countryRank?: number
+  rankChange?: number | null
   totalXp: number
   level: number
 }

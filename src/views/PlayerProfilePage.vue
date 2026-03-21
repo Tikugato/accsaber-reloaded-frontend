@@ -8,7 +8,7 @@ import CountryFlag from '@/components/domain/CountryFlag.vue'
 import LevelBadge from '@/components/domain/LevelBadge.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import { useCategoryStore } from '@/stores/categories'
-import type { LevelResponse, StatsDiffResponse, UserCategoryStatisticsResponse, UserResponse } from '@/types/api/users'
+import type { LevelResponse, StatsDiffResponse, UserAllStatisticsResponse, UserCategoryStatisticsResponse, UserResponse } from '@/types/api/users'
 import type { CategoryCode } from '@/types/display'
 import { getRankClass } from '@/utils/ranking'
 import { computed, ref, watch } from 'vue'
@@ -26,6 +26,7 @@ const userId = computed(() => route.params.userId as string)
 const user = ref<UserResponse | null>(null)
 const level = ref<LevelResponse | null>(null)
 const stats = ref<UserCategoryStatisticsResponse[]>([])
+const xpStats = ref<UserAllStatisticsResponse | null>(null)
 const statsDiff = ref<StatsDiffResponse | null>(null)
 const loading = ref(true)
 const error = ref(false)
@@ -52,7 +53,6 @@ const totalXpDiff = computed(() => {
   if (!statsDiff.value) return 0
   return (statsDiff.value.scoreXpDiff ?? 0) + (statsDiff.value.milestoneXpDiff ?? 0) + (statsDiff.value.milestoneSetBonusXpDiff ?? 0)
 })
-
 
 async function fetchStatsDiff() {
   try {
@@ -104,23 +104,25 @@ async function fetchProfile() {
   user.value = null
   level.value = null
   stats.value = []
+  xpStats.value = null
 
   try {
-    const { getUser, getUserLevel, getUserCategoryStatistics } = await import('@/api/users')
+    const { getUser, getUserLevel, getUserAllStatistics } = await import('@/api/users')
 
     const userRes = await getUser(userId.value)
     user.value = userRes
 
-    const [levelRes, statsRes] = await Promise.allSettled([
+    const [levelRes, allStatsRes] = await Promise.allSettled([
       getUserLevel(userId.value),
-      getUserCategoryStatistics(userId.value),
+      getUserAllStatistics(userId.value),
     ])
 
     if (levelRes.status === 'fulfilled') {
       level.value = levelRes.value
     }
-    if (statsRes.status === 'fulfilled') {
-      stats.value = statsRes.value
+    if (allStatsRes.status === 'fulfilled') {
+      xpStats.value = allStatsRes.value
+      stats.value = allStatsRes.value.categories
     }
 
     fetchStatsDiff()
@@ -129,6 +131,7 @@ async function fetchProfile() {
     user.value = null
     level.value = null
     stats.value = []
+    xpStats.value = null
   }
   loading.value = false
 }
@@ -215,7 +218,7 @@ watch(activeCategory, () => { if (user.value) fetchStatsDiff() })
             <CountryFlag :country="user.country" />
           </div>
 
-          <CategoryTabs :model-value="activeCategory" @update:model-value="activeCategory = $event" />
+          <CategoryTabs :model-value="activeCategory" :exclude="['xp']" @update:model-value="activeCategory = $event" />
 
           <div class="profile-hero__stats">
             <StatBlock label="Total AP" :value="activeStats?.ap ?? 0" :trend="statsDiff?.apDiff" />
@@ -252,7 +255,7 @@ watch(activeCategory, () => { if (user.value) fetchStatsDiff() })
       <div class="profile-page__content">
         <ProfileScoresTab v-if="activeTab === 'scores'" :user-id="userId" :category="activeCategory"
           :search="scoreSearch" />
-        <ProfileStatisticsTab v-if="activeTab === 'statistics'" :user-id="userId" :category="activeCategory" />
+        <ProfileStatisticsTab v-if="activeTab === 'statistics'" :user-id="userId" :category="activeCategory" :xp-stats="xpStats" />
         <ProfileMilestonesTab v-if="activeTab === 'milestones'" :user-id="userId" />
       </div>
     </template>
