@@ -158,6 +158,7 @@ export interface CreateMilestoneRequest {
   querySpec: Record<string, unknown>
   targetValue: number
   comparison: string
+  blExclusive?: boolean
   mapDifficultyIds?: string[]
 }
 
@@ -169,6 +170,16 @@ export interface CreateMilestoneSetRequest {
   title: string
   description: string
   setBonusXp: number
+}
+
+export interface CreatePrerequisiteRequest {
+  milestoneId: string
+  prerequisiteMilestoneId: string
+  blocker: boolean
+}
+
+export interface UpdatePrerequisiteRequest {
+  blocker: boolean
 }
 
 export type { ActivateMilestonesRequest, AdminMilestoneListParams } from './milestones'

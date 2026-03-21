@@ -70,7 +70,7 @@ const tableOptions = computed(() =>
 
 const columnOptions = computed(() => {
   const tbl = props.schema.tables?.[local.value.from]
-  if (!tbl) return []
+  if (!tbl?.columns) return []
   return Object.keys(tbl.columns).map((c) => ({ value: c, label: c }))
 })
 

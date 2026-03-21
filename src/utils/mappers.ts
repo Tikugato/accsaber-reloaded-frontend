@@ -1,8 +1,9 @@
 import type { MapDifficultyResponse } from '@/types/api/maps'
+import type { MilestoneCompletionResponse } from '@/types/api/milestones'
 import type { LeaderboardResponse, ScoreResponse, UserMilestoneProgressResponse } from '@/types/api/users'
 import type { CategoryCode, DifficultyScoreDisplay, MapDisplay, MilestoneDisplay, PlayerDisplay, ScoreDisplay } from '@/types/display'
 
-export function formatDifficulty(diff: MapDifficultyResponse['difficulty']): string {
+export function formatDifficulty(diff: string): string {
   switch (diff) {
     case 'EASY': return 'Easy'
     case 'NORMAL': return 'Normal'
@@ -37,7 +38,7 @@ export function toScoreDisplay(
     mapDifficultyId: score.mapDifficultyId,
     mapName: score.songName ?? 'Unknown Map',
     artistName: score.songAuthor,
-    difficulty: formatDifficulty(score.difficulty as MapDifficultyResponse['difficulty']),
+    difficulty: formatDifficulty(score.difficulty),
     categoryCode: categoryCode ?? 'overall',
     coverUrl: score.coverUrl,
     leaderboardRank: score.rank,
@@ -126,10 +127,34 @@ export function toMilestoneDisplay(
     id: m.milestoneId,
     title: m.title,
     description: m.description,
+    type: m.type,
     tier: m.tier,
     xp: m.xp,
     completionPercent: m.completionPercentage,
     isCompleted: m.completed,
     categoryCode,
+  }
+}
+
+export function toMilestoneCompletion(
+  m: UserMilestoneProgressResponse,
+): MilestoneCompletionResponse {
+  return {
+    milestoneId: m.milestoneId,
+    title: m.title,
+    description: m.description,
+    type: m.type,
+    tier: m.tier,
+    xp: m.xp,
+    targetValue: m.targetValue,
+    comparison: 'GTE',
+    setId: m.setId,
+    categoryId: m.categoryId,
+    blExclusive: false,
+    completions: 0,
+    totalPlayers: 0,
+    completionPercentage: m.completionPercentage,
+    userCompleted: m.completed,
+    userCompletedAt: m.completedAt ?? undefined,
   }
 }

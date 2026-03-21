@@ -4,11 +4,13 @@ import type {
   AdminMilestoneListParams,
   CreateMilestoneRequest,
   CreateMilestoneSetRequest,
+  CreatePrerequisiteRequest,
   LinkMilestoneMapRequest,
+  UpdatePrerequisiteRequest,
 } from '@/types/api/admin'
-import type { MilestoneResponse, MilestoneSetResponse } from '@/types/api/milestones'
+import type { MilestoneResponse, MilestoneSetResponse, PrerequisiteLinkResponse } from '@/types/api/milestones'
 import type { Page } from '@/types/pagination'
-import { get, patch, post } from '../client'
+import { del, get, patch, post, put } from '../client'
 import { buildQuery } from '../utils'
 
 export function getAdminMilestones(params?: AdminMilestoneListParams): Promise<Page<MilestoneResponse>> {
@@ -50,4 +52,24 @@ export function refreshMilestoneStats(): Promise<void> {
 
 export function linkMilestoneMaps(id: string, req: LinkMilestoneMapRequest): Promise<void> {
   return post<void>(`/admin/milestones/${id}/map-links`, req)
+}
+
+export function unlinkMilestoneMaps(id: string): Promise<void> {
+  return del<void>(`/admin/milestones/${id}/map-links`)
+}
+
+export function createPrerequisite(req: CreatePrerequisiteRequest): Promise<PrerequisiteLinkResponse> {
+  return post<PrerequisiteLinkResponse>('/admin/milestones/prerequisites', req)
+}
+
+export function updatePrerequisite(linkId: string, req: UpdatePrerequisiteRequest): Promise<PrerequisiteLinkResponse> {
+  return put<PrerequisiteLinkResponse>(`/admin/milestones/prerequisites/${linkId}`, req)
+}
+
+export function deletePrerequisite(linkId: string): Promise<void> {
+  return del<void>(`/admin/milestones/prerequisites/${linkId}`)
+}
+
+export function getAdminPrerequisites(milestoneId: string): Promise<PrerequisiteLinkResponse[]> {
+  return get<PrerequisiteLinkResponse[]>(`/admin/milestones/${milestoneId}/prerequisites`)
 }

@@ -1,3 +1,5 @@
+import type { MilestoneType } from './enums'
+
 export interface Tab {
   key: string
   label: string
@@ -125,6 +127,7 @@ export interface MilestoneDisplay {
   id: string
   title: string
   description: string
+  type: MilestoneType
   tier: MilestoneTier
   xp: number
   completionPercent: number

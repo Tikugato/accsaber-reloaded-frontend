@@ -10,8 +10,9 @@ import SkeletonLoader from '@/components/common/SkeletonLoader.vue'
 import { useCategoryStore } from '@/stores/categories'
 import type { CreateMilestoneRequest, CreateMilestoneSetRequest } from '@/types/api/admin'
 import type { CategoryResponse } from '@/types/api/categories'
-import type { MilestoneResponse, MilestoneSetResponse } from '@/types/api/milestones'
+import type { MilestoneResponse, MilestoneSetResponse, PrerequisiteLinkResponse } from '@/types/api/milestones'
 import type { MilestoneStatus, MilestoneTier, MilestoneType } from '@/types/enums'
+import { TIER_COLORS } from '@/utils/constants'
 import { computed, ref, watch } from 'vue'
 
 const categoryStore = useCategoryStore()
@@ -91,6 +92,7 @@ const milestoneForm = ref<Omit<CreateMilestoneRequest, 'categoryId'> & { categor
   querySpec: {},
   targetValue: 1,
   comparison: 'GTE',
+  blExclusive: false,
   _query: { ...EMPTY_QUERY },
   _mapDifficultyIds: '',
 })
@@ -127,6 +129,7 @@ function openCreateMilestone() {
     querySpec: {},
     targetValue: 1,
     comparison: 'GTE',
+    blExclusive: false,
     _query: {
       select: { function: 'MAX', column: '' },
       from: Object.keys(schema.value.tables)[0] ?? 'scores',
@@ -253,6 +256,68 @@ async function submitLinkMaps() {
   }
 }
 
+const showPrereqModal = ref(false)
+const prereqTarget = ref<MilestoneResponse | null>(null)
+const prereqLinks = ref<PrerequisiteLinkResponse[]>([])
+const prereqLoading = ref(false)
+const prereqForm = ref({ prerequisiteMilestoneId: '', blocker: false })
+
+async function openPrerequisites(m: MilestoneResponse) {
+  prereqTarget.value = m
+  prereqLoading.value = true
+  prereqForm.value = { prerequisiteMilestoneId: '', blocker: false }
+  showPrereqModal.value = true
+  try {
+    const { getAdminPrerequisites } = await import('@/api/admin/milestones')
+    prereqLinks.value = await getAdminPrerequisites(m.id)
+  } catch {
+    prereqLinks.value = []
+  } finally {
+    prereqLoading.value = false
+  }
+}
+
+const prereqCandidates = computed(() =>
+  milestones.value
+    .filter((m) => m.id !== prereqTarget.value?.id)
+    .map((m) => ({ value: m.id, label: `${m.title} (${m.tier})` })),
+)
+
+async function addPrerequisite() {
+  if (!prereqTarget.value || !prereqForm.value.prerequisiteMilestoneId) return
+  prereqLoading.value = true
+  try {
+    const { createPrerequisite } = await import('@/api/admin/milestones')
+    const link = await createPrerequisite({
+      milestoneId: prereqTarget.value.id,
+      prerequisiteMilestoneId: prereqForm.value.prerequisiteMilestoneId,
+      blocker: prereqForm.value.blocker,
+    })
+    prereqLinks.value.push(link)
+    prereqForm.value = { prerequisiteMilestoneId: '', blocker: false }
+  } finally {
+    prereqLoading.value = false
+  }
+}
+
+async function toggleBlocker(link: PrerequisiteLinkResponse) {
+  try {
+    const { updatePrerequisite } = await import('@/api/admin/milestones')
+    const updated = await updatePrerequisite(link.id, { blocker: !link.blocker })
+    const idx = prereqLinks.value.findIndex((l) => l.id === link.id)
+    if (idx !== -1) prereqLinks.value[idx] = updated
+  } catch { }
+}
+
+async function removePrerequisite(link: PrerequisiteLinkResponse) {
+  if (!confirm(`Remove prerequisite "${link.prerequisiteTitle}"?`)) return
+  try {
+    const { deletePrerequisite } = await import('@/api/admin/milestones')
+    await deletePrerequisite(link.id)
+    prereqLinks.value = prereqLinks.value.filter((l) => l.id !== link.id)
+  } catch { }
+}
+
 const selectedSet = computed(() => sets.value.find((s) => s.id === selectedSetId.value))
 
 const categoryOptions = computed(() => [
@@ -261,14 +326,6 @@ const categoryOptions = computed(() => [
 ])
 
 const setOptions = computed(() => sets.value.map((s) => ({ value: s.id, label: s.title })))
-
-const TIER_COLORS: Record<string, string> = {
-  BRONZE: 'var(--tier-bronze)',
-  SILVER: 'var(--tier-silver)',
-  GOLD: 'var(--tier-gold)',
-  PLATINUM: 'var(--tier-platinum)',
-  DIAMOND: 'var(--tier-diamond)',
-}
 
 const STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Draft' },
@@ -353,7 +410,7 @@ const STATUS_OPTIONS = [
           <EmptyState v-else-if="!milestones.length" message="No milestones in this set yet" />
           <div v-else class="milestone-list">
             <div v-for="m in milestones" :key="m.id" class="milestone-card">
-              <div class="milestone-card__tier" :style="{ background: TIER_COLORS[m.tier] }" />
+              <div class="milestone-card__tier" :style="{ background: TIER_COLORS[m.tier.toUpperCase()] }" />
               <div class="milestone-card__body">
                 <div class="milestone-card__top">
                   <span class="milestone-card__title">{{ m.title }}</span>
@@ -362,6 +419,7 @@ const STATUS_OPTIONS = [
                     {{ m.status }}
                   </span>
                   <span class="milestone-card__type">{{ m.type }}</span>
+                  <span v-if="m.blExclusive" class="milestone-card__bl">BL</span>
                   <span class="milestone-card__xp">+{{ m.xp }} XP</span>
                 </div>
                 <p v-if="m.description" class="milestone-card__desc">{{ m.description }}</p>
@@ -379,6 +437,7 @@ const STATUS_OPTIONS = [
                   Activate
                 </BaseButton>
                 <BaseButton size="sm" @click="openLinkMaps(m)">Link Maps</BaseButton>
+                <BaseButton size="sm" @click="openPrerequisites(m)">Prerequisites</BaseButton>
                 <BaseButton size="sm" :loading="milestoneActionLoading[m.id]" @click="backfill(m)">Backfill</BaseButton>
                 <BaseButton v-if="m.status === 'ACTIVE'" size="sm" variant="destructive"
                   :loading="milestoneActionLoading[m.id]" @click="deactivate(m)">
@@ -426,6 +485,13 @@ const STATUS_OPTIONS = [
             :options="TIERS.map((t) => ({ value: t, label: t.charAt(0) + t.slice(1).toLowerCase() }))" />
         </div>
         <BaseInput v-model.number="milestoneForm.xp" label="XP" type="number" style="width: 100px" />
+        <div class="form-field">
+          <label class="form-label">BL Exclusive</label>
+          <label class="form-checkbox">
+            <input type="checkbox" v-model="milestoneForm.blExclusive" />
+            Requires BeatLeader
+          </label>
+        </div>
       </div>
       <div class="milestone-form__row">
         <div class="form-field" style="flex: 1">
@@ -488,6 +554,48 @@ const STATUS_OPTIONS = [
       <BaseButton @click="showLinkModal = false">Cancel</BaseButton>
       <BaseButton variant="primary" :loading="linkLoading" :disabled="!linkMapIds.trim()" @click="submitLinkMaps">Link
         Maps</BaseButton>
+    </template>
+  </BaseModal>
+
+  <BaseModal :open="showPrereqModal" :title="`Prerequisites - ${prereqTarget?.title ?? ''}`"
+    @close="showPrereqModal = false" style="--modal-width: 560px">
+    <div class="modal-form">
+      <div v-if="prereqLoading" class="prereq-loading">
+        <SkeletonLoader variant="text" v-for="i in 3" :key="i" />
+      </div>
+      <template v-else>
+        <div v-if="prereqLinks.length" class="prereq-list">
+          <div v-for="link in prereqLinks" :key="link.id" class="prereq-item">
+            <span class="prereq-item__tier" :style="{ color: TIER_COLORS[link.prerequisiteTier.toUpperCase()] }">
+              {{ link.prerequisiteTier }}
+            </span>
+            <span class="prereq-item__title">{{ link.prerequisiteTitle }}</span>
+            <button class="prereq-item__blocker" :class="{ 'prereq-item__blocker--active': link.blocker }"
+              @click="toggleBlocker(link)"
+              :title="link.blocker ? 'Blocker (click to unset)' : 'Not blocking (click to set)'">
+              {{ link.blocker ? 'Blocker' : 'Soft' }}
+            </button>
+            <BaseButton size="sm" variant="destructive" @click="removePrerequisite(link)">Remove</BaseButton>
+          </div>
+        </div>
+        <p v-else class="prereq-empty">No prerequisites defined</p>
+
+        <div class="prereq-add">
+          <BaseSelect v-model="prereqForm.prerequisiteMilestoneId" :options="prereqCandidates"
+            placeholder="Select prerequisite..." style="flex: 1" />
+          <label class="prereq-blocker-label">
+            <input type="checkbox" v-model="prereqForm.blocker" />
+            Blocker
+          </label>
+          <BaseButton size="sm" variant="primary" :disabled="!prereqForm.prerequisiteMilestoneId"
+            @click="addPrerequisite">
+            Add
+          </BaseButton>
+        </div>
+      </template>
+    </div>
+    <template #footer>
+      <BaseButton @click="showPrereqModal = false">Close</BaseButton>
     </template>
   </BaseModal>
 </template>
@@ -897,5 +1005,110 @@ const STATUS_OPTIONS = [
   font-size: var(--text-caption);
   color: var(--error);
   margin: 0;
+}
+
+.milestone-card__bl {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--info) 15%, transparent);
+  color: var(--info);
+}
+
+.form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.prereq-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.prereq-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.prereq-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-btn);
+}
+
+.prereq-item__tier {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.prereq-item__title {
+  font-size: var(--text-body);
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prereq-item__blocker {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--bg-overlay);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 100ms;
+}
+
+.prereq-item__blocker--active {
+  background: color-mix(in srgb, var(--error) 15%, transparent);
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.prereq-empty {
+  font-size: var(--text-caption);
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: var(--space-md);
+  margin: 0;
+}
+
+.prereq-add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--bg-overlay);
+}
+
+.prereq-blocker-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 </style>

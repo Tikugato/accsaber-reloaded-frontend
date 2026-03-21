@@ -1,4 +1,4 @@
-import type { MetricType, TimeRange } from '@/types/display'
+import type { MetricType, TimeRange } from '@/types/display';
 
 export const TIME_RANGE_PARAMS: Record<TimeRange, { amount: number; unit: 'h' | 'd' | 'w' | 'mo' }> = {
   '24h': { amount: 24, unit: 'h' },
@@ -38,3 +38,45 @@ export const MAP_STATS_METRICS: { key: MetricType; label: string }[] = [
   { key: 'avgAccuracy', label: 'Avg AP' },
   { key: 'rankedPlays', label: 'Total Scores' },
 ]
+
+export const TIER_COLORS: Record<string, string> = {
+  BRONZE: 'var(--tier-bronze)',
+  SILVER: 'var(--tier-silver)',
+  GOLD: 'var(--tier-gold)',
+  PLATINUM: 'var(--tier-platinum)',
+  DIAMOND: 'var(--tier-diamond)',
+}
+
+export const TIER_ORDER: Record<string, number> = {
+  BRONZE: 0, bronze: 0,
+  SILVER: 1, silver: 1,
+  GOLD: 2, gold: 2,
+  PLATINUM: 3, platinum: 3,
+  DIAMOND: 4, diamond: 4,
+}
+
+export const TIER_SCALES: Record<string, number> = {
+  BRONZE: 0.8,
+  SILVER: 0.9,
+  GOLD: 1.0,
+  PLATINUM: 1.15,
+  DIAMOND: 1.3,
+}
+
+export function tierColor(tier: string): string {
+  return TIER_COLORS[tier.toUpperCase()] ?? 'var(--text-tertiary)'
+}
+
+export function hashString(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash)
+}
+
+export function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 9301 + 49297) * 49297
+  return x - Math.floor(x)
+}
