@@ -69,7 +69,7 @@ export function useStarChart(
     const sorted = [...sets.value].sort((a, b) => a.title.localeCompare(b.title))
     const totalCount = sorted.length + lockedCount
 
-    return sorted.map((set, i) => {
+    const nodes = sorted.map((set, i) => {
       const milestones = milestonesBySet.value.get(set.id) ?? []
       const completedCount = milestones.filter((m) => m.userCompleted === true).length
       const completionPct = milestones.length > 0
@@ -84,6 +84,32 @@ export function useStarChart(
         completionPercentage: set.userCompletionPercentage ?? completionPct,
       }
     })
+
+    const minDist = 70
+    for (let pass = 0; pass < 3; pass++) {
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodes[i].position
+          const b = nodes[j].position
+          const dx = b.x - a.x
+          const dy = b.y - a.y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist >= minDist || dist === 0) continue
+
+          const padX = containerWidth * 0.1
+          const padY = containerHeight * 0.15
+          const overlap = (minDist - dist) / 2
+          const nx = dx / dist
+          const ny = dy / dist
+          a.x = Math.max(padX, Math.min(containerWidth - padX, a.x - nx * overlap))
+          a.y = Math.max(padY, Math.min(containerHeight - padY, a.y - ny * overlap))
+          b.x = Math.max(padX, Math.min(containerWidth - padX, b.x + nx * overlap))
+          b.y = Math.max(padY, Math.min(containerHeight - padY, b.y + ny * overlap))
+        }
+      }
+    }
+
+    return nodes
   }
 
   function computeHighways(nodes: SetNodeLayout[], crossSetEdges?: CrossSetEdge[]): Highway[] {

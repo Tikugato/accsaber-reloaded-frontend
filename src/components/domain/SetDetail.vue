@@ -322,6 +322,29 @@ const starPositions = computed<StarLayout[]>(() => {
     }
   }
 
+  const minDist = 8
+  const ids = [...positions.keys()]
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 0; i < ids.length; i++) {
+      const a = positions.get(ids[i])!
+      for (let j = i + 1; j < ids.length; j++) {
+        const b = positions.get(ids[j])!
+        const dx = b.x - a.x
+        const dy = b.y - a.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist >= minDist || dist === 0) continue
+
+        const overlap = (minDist - dist) / 2
+        const nx = dx / dist
+        const ny = dy / dist
+        a.x = Math.max(padding, Math.min(100 - padding, a.x - nx * overlap))
+        a.y = Math.max(padding, Math.min(100 - padding, a.y - ny * overlap))
+        b.x = Math.max(padding, Math.min(100 - padding, b.x + nx * overlap))
+        b.y = Math.max(padding, Math.min(100 - padding, b.y + ny * overlap))
+      }
+    }
+  }
+
   return sorted.map((m) => ({
     milestone: m,
     position: positions.get(m.milestoneId)!,
