@@ -66,10 +66,26 @@ const hoveredCompletedCount = computed(() => {
 })
 
 const NODE_TOOLTIP_OFFSET = 50
+const TOOLTIP_MAX_WIDTH = 200
+const TOOLTIP_MARGIN = 8
+const TOOLTIP_FLIP_THRESHOLD = 80
+
+const tooltipFlipped = ref(false)
 
 function onSetHover(set: MilestoneSetResponse, position: { x: number; y: number }) {
   hoveredSet.value = set
-  tooltipPos.value = { x: position.x, y: position.y - NODE_TOOLTIP_OFFSET }
+
+  const halfTooltip = TOOLTIP_MAX_WIDTH / 2
+  const clampedX = Math.max(halfTooltip + TOOLTIP_MARGIN, Math.min(position.x, containerWidth.value - halfTooltip - TOOLTIP_MARGIN))
+
+  const aboveY = position.y - NODE_TOOLTIP_OFFSET
+  if (aboveY < TOOLTIP_FLIP_THRESHOLD) {
+    tooltipFlipped.value = true
+    tooltipPos.value = { x: clampedX, y: position.y + NODE_TOOLTIP_OFFSET }
+  } else {
+    tooltipFlipped.value = false
+    tooltipPos.value = { x: clampedX, y: aboveY }
+  }
 }
 
 function onResize() {
@@ -106,6 +122,7 @@ onUnmounted(() => {
 
     <Transition name="tooltip">
       <div v-if="hoveredSet" class="set-chart-map__tooltip"
+        :class="{ 'set-chart-map__tooltip--flipped': tooltipFlipped }"
         :style="{ left: `${tooltipPos.x}px`, top: `${tooltipPos.y}px` }">
         <span class="set-chart-map__tooltip-title">{{ hoveredSet.title }}</span>
         <span v-if="hoveredSet.description" class="set-chart-map__tooltip-desc">{{ hoveredSet.description }}</span>
@@ -160,6 +177,10 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+.set-chart-map__tooltip--flipped {
+  transform: translate(-50%, 0);
+}
+
 .set-chart-map__tooltip-title {
   font-size: var(--text-body);
   font-weight: 600;
@@ -202,6 +223,10 @@ onUnmounted(() => {
 .tooltip-enter-from {
   opacity: 0;
   transform: translate(-50%, calc(-100% + 4px));
+}
+
+.tooltip-enter-from.set-chart-map__tooltip--flipped {
+  transform: translate(-50%, -4px);
 }
 
 .tooltip-leave-to {
