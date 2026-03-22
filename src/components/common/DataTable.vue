@@ -38,12 +38,9 @@ function handleRowClick(row: Record<string, unknown>, index: number, event: Mous
   if (props.rowTo) {
     const route = props.rowTo(row)
     if (!route) return
-    if (event.ctrlKey || event.metaKey || event.button === 1) {
-      const resolved = router.resolve(route)
-      window.open(resolved.href, '_blank')
-    } else {
-      router.push(route)
-    }
+    if (event.ctrlKey || event.metaKey || event.button === 1) return
+    event.preventDefault()
+    router.push(route)
   } else if (props.rowClickable) {
     emit('rowClick', row, index)
   }
@@ -97,10 +94,11 @@ function sortIcon(col: TableColumn): string {
             <tr v-for="(row, index) in rows" :key="resolveRowKey(row, index)" class="data-table__row"
               :class="[{ 'data-table__row--clickable': rowClickable || !!rowTo }, rowClass?.(row, index)]"
               @click="handleRowClick(row, index, $event)">
-              <td v-for="col in columns" :key="col.key" class="data-table__td" :class="{
+              <td v-for="(col, colIdx) in columns" :key="col.key" class="data-table__td" :class="{
                 'data-table__td--mono': col.mono,
                 [`data-table__td--${col.align ?? 'left'}`]: true,
               }">
+                <router-link v-if="colIdx === 0 && rowTo?.(row)" :to="rowTo!(row)!" class="data-table__row-link" tabindex="-1" aria-hidden="true" />
                 <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]" :index="index">
                   {{ row[col.key] }}
                 </slot>
@@ -195,6 +193,7 @@ function sortIcon(col: TableColumn): string {
 }
 
 .data-table__row {
+  position: relative;
   height: 48px;
   border-left: 2px solid transparent;
   transition: border-color 120ms ease, background-color 120ms ease;
@@ -215,6 +214,20 @@ function sortIcon(col: TableColumn): string {
 .data-table__row--clickable:hover {
   border-left-color: var(--accent);
   background: color-mix(in srgb, var(--bg-elevated) 80%, var(--accent) 5%);
+}
+
+.data-table__row-link {
+  position: static;
+  display: inline;
+  text-decoration: none;
+  color: inherit;
+}
+
+.data-table__row-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
 .data-table__td {

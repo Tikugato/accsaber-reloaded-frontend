@@ -33,7 +33,7 @@ const mapHref = computed(() =>
 
 function handleClick(e: MouseEvent) {
   if (!mapHref.value) return
-  if (e.ctrlKey || e.metaKey || e.button === 1) return // let the <a> handle it
+  if (e.ctrlKey || e.metaKey || e.button === 1) return
   e.preventDefault()
   router.push({
     path: `/maps/${props.score.mapId}`,
