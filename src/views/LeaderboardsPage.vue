@@ -197,7 +197,7 @@ function rowClass(row: Record<string, unknown>): Record<string, boolean> {
 
 function playerRowTo(row: Record<string, unknown>) {
   const query: Record<string, string> = {}
-  if (activeCategory.value && activeCategory.value !== 'overall') {
+  if (activeCategory.value && activeCategory.value !== 'overall' && activeCategory.value !== 'xp') {
     query.category = activeCategory.value
   }
   return { name: 'player-profile', params: { userId: row.userId as string }, query }

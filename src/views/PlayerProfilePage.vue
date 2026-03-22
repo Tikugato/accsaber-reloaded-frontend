@@ -32,7 +32,8 @@ const loading = ref(true)
 const error = ref(false)
 
 const activeTab = ref('scores')
-const activeCategory = ref<CategoryCode>((route.query.category as CategoryCode) || 'overall')
+const initialCategory = (route.query.category as CategoryCode) || 'overall'
+const activeCategory = ref<CategoryCode>(initialCategory === 'xp' ? 'overall' : initialCategory)
 const scoreSearch = ref('')
 
 const profileTabs = [
