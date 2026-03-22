@@ -123,10 +123,10 @@ const starPositions = computed<StarLayout[]>(() => {
   const allPrereqs = [...intraSetPrereqs.value, ...crossSetPrereqs.value]
 
   if (allPrereqs.length === 0) {
-    const baseRadius = Math.min(35, 15 + sorted.length * 2)
+    const baseRadius = Math.min(25, 12 + sorted.length * 1.5)
     return sorted.map((m, i) => {
       const angle = (2 * Math.PI * i) / sorted.length - Math.PI / 2
-      const r = baseRadius + seededRandom(hashString(m.milestoneId)) * 8 - 4
+      const r = baseRadius + seededRandom(hashString(m.milestoneId)) * 5 - 2.5
       return {
         milestone: m,
         position: {
@@ -138,14 +138,10 @@ const starPositions = computed<StarLayout[]>(() => {
   }
 
   const parentsOf = new Map<string, string[]>()
-  const childrenOf = new Map<string, string[]>()
 
   for (const p of allPrereqs) {
     if (!parentsOf.has(p.milestoneId)) parentsOf.set(p.milestoneId, [])
     parentsOf.get(p.milestoneId)!.push(p.prerequisiteMilestoneId)
-
-    if (!childrenOf.has(p.prerequisiteMilestoneId)) childrenOf.set(p.prerequisiteMilestoneId, [])
-    childrenOf.get(p.prerequisiteMilestoneId)!.push(p.milestoneId)
   }
 
   const depths = new Map<string, number>()
@@ -206,8 +202,7 @@ const starPositions = computed<StarLayout[]>(() => {
   }
 
   const ghostCount = ghostNodes.value.length
-  const padding = ghostCount > 0 ? 14 : 10
-  const xRange = 100 - padding * 2
+  const padding = ghostCount > 0 ? 22 : 18
   const yRange = 100 - padding * 2
   const positions = new Map<string, { x: number; y: number }>()
 
@@ -229,7 +224,6 @@ const starPositions = computed<StarLayout[]>(() => {
     roots: MilestoneCompletionResponse[]
     members: Set<string>
     weight: number
-    maxDepth: number
   }
 
   const components: Component[] = []
@@ -242,12 +236,8 @@ const starPositions = computed<StarLayout[]>(() => {
 
     const componentRoots = roots.filter((r) => members.has(r.milestoneId))
     const componentWeight = componentRoots.reduce((s, r) => s + (weights.get(r.milestoneId) ?? 1), 0)
-    let componentMaxDepth = 0
-    for (const id of members) {
-      componentMaxDepth = Math.max(componentMaxDepth, depths.get(id) ?? 0)
-    }
 
-    components.push({ roots: componentRoots, members, weight: componentWeight, maxDepth: componentMaxDepth })
+    components.push({ roots: componentRoots, members, weight: componentWeight })
   }
 
   for (const m of sorted) {
@@ -257,28 +247,28 @@ const starPositions = computed<StarLayout[]>(() => {
         roots: [m],
         members: new Set([m.milestoneId]),
         weight: 1,
-        maxDepth: 0,
       })
     }
   }
 
   components.sort((a, b) => b.weight - a.weight)
 
-  function layoutNode(id: string, yMin: number, yMax: number, compMaxDepth: number, bandYMin: number, bandYMax: number) {
-    const d = depths.get(id) ?? 0
+  const stepSize = Math.min(12, (100 - padding * 2) / Math.max(maxDepth, 1))
+
+  function layoutNode(id: string, parentX: number, yMin: number, yMax: number, bandYMin: number, bandYMax: number) {
     const h = hashString(id)
     const r1 = seededRandom(h)
     const r2 = seededRandom(h + 7)
     const r3 = seededRandom(h + 13)
 
-    const xBase = compMaxDepth === 0 ? 50 : padding + (d / compMaxDepth) * xRange
-    const xNudge = (r1 - 0.5) * 6
+    const xBase = parentX + stepSize
+    const xNudge = (r1 - 0.5) * 4
     const x = Math.min(100 - padding, Math.max(padding, xBase + xNudge))
 
     const yCenter = (yMin + yMax) / 2
     const bandSpan = bandYMax - bandYMin
-    const yDrift = (r2 - 0.5) * bandSpan * 0.25
-    const yWobble = (r3 - 0.5) * 4
+    const yDrift = (r2 - 0.5) * bandSpan * 0.15
+    const yWobble = (r3 - 0.5) * 2
     const y = Math.min(100 - padding, Math.max(padding, yCenter + yDrift + yWobble))
 
     positions.set(id, { x, y })
@@ -291,7 +281,7 @@ const starPositions = computed<StarLayout[]>(() => {
     for (const cid of children) {
       const w = weights.get(cid) ?? 1
       const slice = ((yMax - yMin) * w) / totalWeight
-      layoutNode(cid, cursor, cursor + slice, compMaxDepth, bandYMin, bandYMax)
+      layoutNode(cid, x, cursor, cursor + slice, bandYMin, bandYMax)
       cursor += slice
     }
   }
@@ -308,7 +298,7 @@ const starPositions = computed<StarLayout[]>(() => {
     for (const root of comp.roots) {
       const w = weights.get(root.milestoneId) ?? 1
       const rootSlice = ((bandMax - bandMin) * w) / compTotalWeight
-      layoutNode(root.milestoneId, rootCursor, rootCursor + rootSlice, comp.maxDepth, bandMin, bandMax)
+      layoutNode(root.milestoneId, padding - stepSize, rootCursor, rootCursor + rootSlice, bandMin, bandMax)
       rootCursor += rootSlice
     }
 
@@ -319,9 +309,21 @@ const starPositions = computed<StarLayout[]>(() => {
     if (!positions.has(m.milestoneId)) {
       const h = hashString(m.milestoneId)
       positions.set(m.milestoneId, {
-        x: padding + seededRandom(h) * xRange,
+        x: padding + seededRandom(h) * yRange,
         y: padding + seededRandom(h + 1) * yRange,
       })
+    }
+  }
+
+  let posMinX = 100, posMaxX = 0
+  for (const pos of positions.values()) {
+    if (pos.x < posMinX) posMinX = pos.x
+    if (pos.x > posMaxX) posMaxX = pos.x
+  }
+  const xShift = (100 - posMinX - posMaxX) / 2
+  if (Math.abs(xShift) > 1) {
+    for (const pos of positions.values()) {
+      pos.x = Math.max(padding, Math.min(100 - padding, pos.x + xShift))
     }
   }
 
