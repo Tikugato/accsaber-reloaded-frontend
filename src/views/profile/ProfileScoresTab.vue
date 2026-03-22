@@ -118,21 +118,14 @@ async function fetchScores() {
 }
 
 function scoreRowTo(row: Record<string, unknown>) {
-  return row.mapId
-    ? {
-      path: `/maps/${row.mapId as string}`,
-      query: { difficultyId: row.mapDifficultyId as string },
-    }
-    : undefined
+  if (typeof row.mapId !== 'string') return undefined
+  const query = typeof row.mapDifficultyId === 'string' ? { difficultyId: row.mapDifficultyId } : undefined
+  return { path: `/maps/${row.mapId}`, query }
 }
 
 function handleRowClick(row: Record<string, unknown>) {
-  if (row.mapId) {
-    router.push({
-      path: `/maps/${row.mapId as string}`,
-      query: { difficultyId: row.mapDifficultyId as string },
-    })
-  }
+  const to = scoreRowTo(row)
+  if (to) router.push(to)
 }
 
 function openDetail(diffId: string, event: Event) {
