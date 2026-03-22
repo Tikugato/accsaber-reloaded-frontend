@@ -37,12 +37,7 @@ const { currentPage, sortState, paginationParams, setPage, setSort, resetPage } 
   defaultOrder: 'desc',
   defaultSize: 50,
   sortFieldMap: {
-    rank: 'rank',
-    accuracy: 'accuracy',
-    score: 'score',
-    ap: 'ap',
     weighted: 'weightedAp',
-    streak115: 'streak115',
     date: 'timeSet',
   },
 })

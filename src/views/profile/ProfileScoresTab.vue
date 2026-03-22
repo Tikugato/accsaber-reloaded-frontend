@@ -28,7 +28,7 @@ const { currentPage, sortState, paginationParams, setPage, setSort, resetPage } 
   defaultSort: 'ap',
   defaultOrder: 'desc',
   defaultSize: 20,
-  sortFieldMap: { leaderboardRank: 'rank', weighted: 'weightedAp', date: 'timeSet', streak115: 'streak115' },
+  sortFieldMap: { leaderboardRank: 'rank', weighted: 'weightedAp', date: 'timeSet' },
 })
 
 const loading = ref(false)

@@ -154,7 +154,6 @@ const { currentPage, sortState, paginationParams, setPage, setSort } = usePageab
   defaultSize: 20,
   sortFieldMap: {
     releaseDate: 'rankedAt',
-    complexity: 'complexity',
     name: 'songName',
   },
   secondarySort: null,
@@ -165,6 +164,7 @@ const listColumns: TableColumn[] = [
   { key: 'songName', label: 'Name', sortable: true, align: 'left' },
   { key: 'artistName', label: 'Artist', align: 'left' },
   { key: 'mapperName', label: 'Mapper', align: 'left' },
+  { key: 'category', label: 'Category', sortable: true, align: 'center', width: '100px' },
   { key: 'complexity', label: 'Complexity', sortable: true, align: 'center', width: '100px' },
   { key: 'totalScores', label: 'Scores', sortable: true, align: 'right', mono: true, width: '80px' },
   { key: 'rankedAt', label: 'Released', sortable: true, align: 'right', width: '100px' },
@@ -193,6 +193,8 @@ const listRows = computed(() =>
     difficulty: m.difficulty,
     artistName: m.artistName,
     mapperName: m.mapperName,
+    category: (categoryStore.getCategoryInfo(m.categoryCode)?.name ?? m.categoryCode).replace(/ Acc$/, ''),
+    categoryCode: m.categoryCode,
     complexity: m.complexity,
     totalScores: m.totalScores ?? 0,
     rankedAt: m.rankedAt ?? '',
@@ -201,8 +203,6 @@ const listRows = computed(() =>
 
 const listSortFieldMap: Record<string, string> = {
   songName: 'name',
-  complexity: 'complexity',
-  totalScores: 'totalScores',
   rankedAt: 'releaseDate',
 }
 
@@ -213,8 +213,6 @@ function handleListSort(key: string) {
 const listSortState = computed(() => {
   const reverseMap: Record<string, string> = {
     name: 'songName',
-    complexity: 'complexity',
-    totalScores: 'totalScores',
     releaseDate: 'rankedAt',
   }
   return {
@@ -462,6 +460,12 @@ watch(
               <span class="maps-page__diff-label">{{ row.difficultyLabel }}</span>
             </div>
           </template>
+          <template #cell-category="{ row }">
+            <span class="maps-page__category"
+              :style="{ '--cat-accent': categoryStore.getAccent(row.categoryCode as string) }">
+              {{ row.category }}
+            </span>
+          </template>
           <template #cell-complexity="{ row }">
             <ComplexityBadge :complexity="row.complexity as number" :difficulty="(row.difficulty as string)" />
           </template>
@@ -682,6 +686,11 @@ watch(
 .maps-page__diff-label {
   font-size: var(--text-caption);
   color: var(--text-secondary);
+}
+
+.maps-page__category {
+  color: var(--cat-accent);
+  font-size: var(--text-caption);
 }
 
 .maps-page__mono {
