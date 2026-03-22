@@ -81,6 +81,14 @@ export interface PrerequisiteLinkResponse {
   createdAt: string
 }
 
+export interface MilestoneHolderResponse {
+  userId: string
+  name: string
+  avatarUrl: string
+  country: string
+  completedAt: string
+}
+
 export interface ActivateMilestonesRequest {
   milestoneIds: string[]
 }

@@ -1,5 +1,6 @@
 import type {
   MilestoneCompletionResponse,
+  MilestoneHolderResponse,
   MilestoneListParams,
   MilestoneResponse,
   MilestoneSetResponse,
@@ -33,6 +34,10 @@ export function getLevels(): Promise<{ levels: { level: number; xpRequired: numb
 
 export function getSetPrerequisites(setId: string): Promise<PrerequisiteLinkResponse[]> {
   return get<PrerequisiteLinkResponse[]>(`/milestones/sets/${setId}/prerequisites`)
+}
+
+export function getMilestoneHolders(milestoneId: string): Promise<Page<MilestoneHolderResponse>> {
+  return get<Page<MilestoneHolderResponse>>(`/milestones/${milestoneId}/holders?size=50`)
 }
 
 export type MilestoneSort = 'tier' | 'completions' | 'completedAt'

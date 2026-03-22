@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MilestoneHolderTooltip from '@/components/domain/MilestoneHolderTooltip.vue';
 import type { MilestoneCompletionResponse } from '@/types/api/milestones';
 import { tierColor as getTierColor } from '@/utils/constants';
 import { formatDifficulty } from '@/utils/mappers';
@@ -24,6 +25,8 @@ const completionText = computed(() => {
   const { completions, totalPlayers, completionPercentage } = props.milestone
   return `${completions ?? 0}/${totalPlayers ?? 0} players (${(completionPercentage ?? 0).toFixed(1)}%)`
 })
+
+const showHolderTooltip = computed(() => (props.milestone.completions ?? 0) > 0 && (props.milestone.completions ?? 0) < 50)
 
 const accuracy = computed(() => {
   if (!props.milestone.score || !props.milestone.maxScore) return null
@@ -97,6 +100,8 @@ function toggleExpand() {
         <span v-if="progressPercent != null && !isCompleted" class="milestone-detail__progress-label">{{
           progressPercent.toFixed(1) }}%</span>
         <span class="milestone-detail__completion">{{ completionText }}</span>
+        <MilestoneHolderTooltip v-if="showHolderTooltip" :milestone-id="milestone.milestoneId"
+          :completions="milestone.completions ?? 0" />
         <svg v-if="isCompleted" class="milestone-detail__check-icon" viewBox="0 0 20 20" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <polyline points="4 10 8 14 16 6" />
@@ -138,7 +143,11 @@ function toggleExpand() {
 
       <div class="milestone-detail__stats">
         <span class="milestone-detail__xp">{{ milestone.xp }} XP</span>
-        <span class="milestone-detail__completion">{{ completionText }}</span>
+        <span class="milestone-detail__completion-row">
+          <span class="milestone-detail__completion">{{ completionText }}</span>
+          <MilestoneHolderTooltip v-if="showHolderTooltip" :milestone-id="milestone.milestoneId"
+            :completions="milestone.completions ?? 0" />
+        </span>
       </div>
 
       <div v-if="progressPercent != null && !isCompleted" class="milestone-detail__progress">
@@ -276,6 +285,12 @@ function toggleExpand() {
 .milestone-detail__completion {
   font-size: var(--text-caption);
   color: var(--text-tertiary);
+}
+
+.milestone-detail__completion-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
 .milestone-detail__score {
