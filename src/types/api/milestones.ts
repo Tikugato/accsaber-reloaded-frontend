@@ -75,6 +75,8 @@ export interface PrerequisiteLinkResponse {
   prerequisiteMilestoneId: string
   prerequisiteTitle: string
   prerequisiteTier: string
+  prerequisiteSetId?: string
+  prerequisiteSetTitle?: string
   blocker: boolean
   createdAt: string
 }

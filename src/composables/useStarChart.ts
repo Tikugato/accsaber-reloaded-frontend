@@ -1,4 +1,5 @@
 import type { MilestoneCompletionResponse, MilestoneSetResponse } from '@/types/api/milestones'
+import type { CrossSetEdge } from '@/types/milestones'
 import { hashString, seededRandom } from '@/utils/constants'
 import type { Ref } from 'vue'
 
@@ -53,9 +54,11 @@ export function useStarChart(
   sets: Ref<MilestoneSetResponse[]>,
   milestonesBySet: Ref<Map<string, MilestoneCompletionResponse[]>>,
 ) {
-  function computeSetPositions(containerWidth: number, containerHeight: number): SetNodeLayout[] {
+  function computeSetPositions(containerWidth: number, containerHeight: number, lockedCount = 0): SetNodeLayout[] {
     const count = sets.value.length
     if (count === 0) return []
+
+    const totalCount = count + lockedCount
 
     return sets.value.map((set, i) => {
       const milestones = milestonesBySet.value.get(set.id) ?? []
@@ -67,18 +70,39 @@ export function useStarChart(
       return {
         id: set.id,
         set,
-        position: computeGridPosition(i, count, containerWidth, containerHeight, hashString(set.id)),
+        position: computeGridPosition(i, totalCount, containerWidth, containerHeight, hashString(set.id)),
         milestoneCount: milestones.length,
         completionPercentage: set.userCompletionPercentage ?? completionPct,
       }
     })
   }
 
-  function computeHighways(nodes: SetNodeLayout[]): Highway[] {
+  function computeHighways(nodes: SetNodeLayout[], crossSetEdges?: CrossSetEdge[]): Highway[] {
     if (nodes.length < 2) return []
+
+    const nodeMap = new Map<string, SetNodeLayout>()
+    for (const n of nodes) nodeMap.set(n.id, n)
 
     const highways: Highway[] = []
     const connected = new Set<string>()
+
+    if (crossSetEdges && crossSetEdges.length > 0) {
+      for (const edge of crossSetEdges) {
+        const from = nodeMap.get(edge.fromSetId)
+        const to = nodeMap.get(edge.toSetId)
+        if (!from || !to) continue
+
+        const key = [edge.fromSetId, edge.toSetId].sort().join('-')
+        if (connected.has(key)) continue
+        connected.add(key)
+
+        highways.push({
+          from: from.position,
+          to: to.position,
+          opacity: Math.min(0.4, 0.15 + edge.count * 0.05),
+        })
+      }
+    }
 
     for (const node of nodes) {
       const distances = nodes
@@ -111,7 +135,7 @@ export function useStarChart(
         highways.push({
           from: node.position,
           to: neighbor.position,
-          opacity: Math.max(0.08, 0.3 - (dist / maxDist) * 0.25),
+          opacity: Math.max(0.05, 0.15 - (dist / maxDist) * 0.12),
         })
       }
     }

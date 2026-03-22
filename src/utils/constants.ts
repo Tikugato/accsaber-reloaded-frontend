@@ -28,9 +28,12 @@ export const ROLE_LABELS: Record<string, string> = {
   RANKING: 'Ranking',
 }
 
+export const BASE_XP_PER_PLAY = 25
+
 export const SCORE_DETAIL_METRICS: { key: MetricType; label: string }[] = [
   { key: 'accuracy' as MetricType, label: 'Accuracy' },
   { key: 'ap' as MetricType, label: 'AP' },
+  { key: 'xpCumulative', label: 'XP (Cumulative)' },
 ]
 
 export const MAP_STATS_METRICS: { key: MetricType; label: string }[] = [

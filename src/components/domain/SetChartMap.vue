@@ -2,6 +2,7 @@
 import type { Highway, SetNodeLayout } from '@/composables/useStarChart'
 import { computeGridPosition, useStarChart } from '@/composables/useStarChart'
 import type { MilestoneCompletionResponse, MilestoneSetResponse } from '@/types/api/milestones'
+import type { CrossSetEdge } from '@/types/milestones'
 import { hashString } from '@/utils/constants'
 import { computed, onMounted, onUnmounted, ref, toRef } from 'vue'
 import SetHighway from './SetHighway.vue'
@@ -12,6 +13,7 @@ const props = defineProps<{
   milestonesBySet: Map<string, MilestoneCompletionResponse[]>
   selectedSetId: string | null
   lockedSets?: { id: string; title: string; index: number }[]
+  crossSetEdges?: CrossSetEdge[]
 }>()
 
 const emit = defineEmits<{
@@ -30,11 +32,13 @@ const { computeSetPositions, computeHighways } = useStarChart(
   toRef(props, 'milestonesBySet'),
 )
 
+const lockedCount = computed(() => props.lockedSets?.length ?? 0)
+
 const setNodes = computed<SetNodeLayout[]>(() =>
-  computeSetPositions(containerWidth.value, containerHeight.value),
+  computeSetPositions(containerWidth.value, containerHeight.value, lockedCount.value),
 )
 
-const totalNodeCount = computed(() => props.sets.length + (props.lockedSets?.length ?? 0))
+const totalNodeCount = computed(() => props.sets.length + lockedCount.value)
 
 const lockedPositions = computed(() =>
   (props.lockedSets ?? []).map((ls) => ({
@@ -49,18 +53,7 @@ const lockedPositions = computed(() =>
   })),
 )
 
-const allNodesForHighways = computed<SetNodeLayout[]>(() => [
-  ...setNodes.value,
-  ...lockedPositions.value.map((ls) => ({
-    id: ls.id,
-    set: { id: ls.id, title: ls.title, description: '', setBonusXp: 0, createdAt: '' },
-    position: ls.position,
-    milestoneCount: 0,
-    completionPercentage: 0,
-  })),
-])
-
-const highways = computed<Highway[]>(() => computeHighways(allNodesForHighways.value))
+const highways = computed<Highway[]>(() => computeHighways(setNodes.value, props.crossSetEdges))
 
 const hoveredMilestoneCount = computed(() => {
   if (!hoveredSet.value) return 0

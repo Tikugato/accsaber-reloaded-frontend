@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import ParticleCanvas from '@/components/common/ParticleCanvas.vue'
 import SkeletonLoader from '@/components/common/SkeletonLoader.vue'
-import SetDetail from '@/components/domain/SetDetail.vue'
-import SetChartMap from '@/components/domain/SetChartMap.vue'
 import MilestoneListView from '@/components/domain/MilestoneListView.vue'
+import SetChartMap from '@/components/domain/SetChartMap.vue'
+import SetDetail from '@/components/domain/SetDetail.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import type { MilestoneCompletionResponse, MilestoneSetResponse, PrerequisiteLinkResponse } from '@/types/api/milestones'
+import type { CrossSetEdge, EnrichedPrerequisite } from '@/types/milestones'
+import { enrichPrerequisites, extractCrossSetEdges } from '@/utils/milestonePrereqs'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -47,8 +49,14 @@ const selectedMilestones = computed(() =>
 
 const prerequisitesBySet = ref<Map<string, PrerequisiteLinkResponse[]>>(new Map())
 
-const selectedPrerequisites = computed(() =>
-  selectedSetId.value ? (prerequisitesBySet.value.get(selectedSetId.value) ?? []) : [],
+const enrichedSelectedPrerequisites = computed<EnrichedPrerequisite[]>(() => {
+  if (!selectedSetId.value) return []
+  const raw = prerequisitesBySet.value.get(selectedSetId.value) ?? []
+  return enrichPrerequisites(raw, selectedSetId.value, milestones.value, sets.value)
+})
+
+const crossSetEdges = computed<CrossSetEdge[]>(() =>
+  extractCrossSetEdges(prerequisitesBySet.value, milestones.value),
 )
 
 const totalMilestones = computed(() => milestones.value.length)
@@ -73,6 +81,8 @@ async function fetchData() {
     ])
     sets.value = setsRes.content
     milestones.value = completionRes
+
+    fetchAllPrerequisites(setsRes.content)
   } catch {
     sets.value = []
     milestones.value = []
@@ -80,19 +90,19 @@ async function fetchData() {
   loading.value = false
 }
 
-async function fetchPrerequisites(setId: string) {
-  if (prerequisitesBySet.value.has(setId)) return
-  try {
-    const { getSetPrerequisites } = await import('@/api/milestones')
-    prerequisitesBySet.value.set(setId, await getSetPrerequisites(setId))
-  } catch {
-    prerequisitesBySet.value.set(setId, [])
-  }
-}
+async function fetchAllPrerequisites(allSets: MilestoneSetResponse[]) {
+  const { getSetPrerequisites } = await import('@/api/milestones')
+  const results = await Promise.allSettled(
+    allSets.map((s) => getSetPrerequisites(s.id)),
+  )
 
-watch(selectedSetId, (id) => {
-  if (id) fetchPrerequisites(id)
-}, { immediate: true })
+  const map = new Map<string, PrerequisiteLinkResponse[]>()
+  for (let i = 0; i < allSets.length; i++) {
+    const result = results[i]
+    map.set(allSets[i].id, result.status === 'fulfilled' ? result.value : [])
+  }
+  prerequisitesBySet.value = map
+}
 
 function handleResize() { isMobile.value = window.innerWidth < 768 }
 
@@ -132,19 +142,32 @@ watch(() => authStore.userId, fetchData)
           </div>
         </div>
         <div v-if="!selectedSetId" class="milestones-page__view-toggle">
-          <button :class="{ 'milestones-page__view-btn--active': viewMode === 'chart' }" class="milestones-page__view-btn"
-            @click="viewMode = 'chart'">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="2" /><circle cx="6" cy="6" r="1.5" /><circle cx="18" cy="8" r="1.5" /><circle cx="8" cy="18" r="1.5" /><circle cx="18" cy="17" r="1.5" />
-              <line x1="7.5" y1="7" x2="10.5" y2="10.5" /><line x1="13.5" y1="10.5" x2="16.5" y2="9" /><line x1="10.5" y1="13.5" x2="9" y2="16.5" /><line x1="13.5" y1="13.5" x2="17" y2="15.5" />
+          <button :class="{ 'milestones-page__view-btn--active': viewMode === 'chart' }"
+            class="milestones-page__view-btn" @click="viewMode = 'chart'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="2" />
+              <circle cx="6" cy="6" r="1.5" />
+              <circle cx="18" cy="8" r="1.5" />
+              <circle cx="8" cy="18" r="1.5" />
+              <circle cx="18" cy="17" r="1.5" />
+              <line x1="7.5" y1="7" x2="10.5" y2="10.5" />
+              <line x1="13.5" y1="10.5" x2="16.5" y2="9" />
+              <line x1="10.5" y1="13.5" x2="9" y2="16.5" />
+              <line x1="13.5" y1="13.5" x2="17" y2="15.5" />
             </svg>
             Chart
           </button>
-          <button :class="{ 'milestones-page__view-btn--active': viewMode === 'list' }" class="milestones-page__view-btn"
-            @click="viewMode = 'list'">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
-              <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+          <button :class="{ 'milestones-page__view-btn--active': viewMode === 'list' }"
+            class="milestones-page__view-btn" @click="viewMode = 'list'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
             </svg>
             List
           </button>
@@ -161,17 +184,16 @@ watch(() => authStore.userId, fetchData)
     </template>
 
     <Transition v-else name="zoom" mode="out-in">
-      <SetDetail v-if="selectedSet" :key="selectedSet.id" :set="selectedSet"
-        :milestones="selectedMilestones" :prerequisites="selectedPrerequisites"
-        :logged-in="authStore.isLoggedIn" @back="selectedSetId = null" />
+      <SetDetail v-if="selectedSet" :key="selectedSet.id" :set="selectedSet" :milestones="selectedMilestones"
+        :prerequisites="enrichedSelectedPrerequisites" :all-milestones="milestones" :logged-in="authStore.isLoggedIn"
+        @back="selectedSetId = null" @navigate-to-set="selectedSetId = $event" />
 
       <SetChartMap v-else-if="!isMobile" key="set-chart-map" :sets="sets" :milestones-by-set="milestonesBySet"
-        :selected-set-id="selectedSetId" :locked-sets="lockedPlaceholders"
+        :selected-set-id="selectedSetId" :locked-sets="lockedPlaceholders" :cross-set-edges="crossSetEdges"
         @select-set="selectedSetId = $event" />
 
       <div v-else key="mobile-list" class="milestones-page__mobile-list">
-        <button v-for="set in sets" :key="set.id" class="milestones-page__mobile-card"
-          @click="selectedSetId = set.id">
+        <button v-for="set in sets" :key="set.id" class="milestones-page__mobile-card" @click="selectedSetId = set.id">
           <div class="milestones-page__mobile-card-header">
             <h3 class="milestones-page__mobile-card-title">{{ set.title }}</h3>
             <span class="milestones-page__mobile-card-count">
@@ -399,6 +421,7 @@ watch(() => authStore.userId, fetchData)
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .zoom-enter-active,
   .zoom-leave-active {
     transition: none;

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { usePanZoom } from '@/composables/usePanZoom'
 import type { StarLayout } from '@/composables/useStarChart'
-import type { MilestoneCompletionResponse, MilestoneSetResponse, PrerequisiteLinkResponse } from '@/types/api/milestones'
+import type { MilestoneCompletionResponse, MilestoneSetResponse } from '@/types/api/milestones'
+import type { MilestoneTier } from '@/types/display'
+import type { EnrichedPrerequisite, GhostNode } from '@/types/milestones'
 import { hashString, seededRandom, TIER_ORDER } from '@/utils/constants'
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import MilestoneDetail from './MilestoneDetail.vue'
@@ -11,12 +13,14 @@ import StarNode from './StarNode.vue'
 const props = defineProps<{
   set: MilestoneSetResponse
   milestones: MilestoneCompletionResponse[]
-  prerequisites: PrerequisiteLinkResponse[]
+  prerequisites: EnrichedPrerequisite[]
+  allMilestones?: MilestoneCompletionResponse[]
   loggedIn?: boolean
 }>()
 
 const emit = defineEmits<{
   back: []
+  navigateToSet: [setId: string]
 }>()
 
 const constellationRef = ref<HTMLElement | null>(null)
@@ -37,11 +41,85 @@ const isSetComplete = computed(() =>
   props.milestones.length > 0 && completedCount.value === props.milestones.length,
 )
 
+const intraSetPrereqs = computed(() =>
+  props.prerequisites.filter((p) => !p.isCrossSet),
+)
+
+const crossSetPrereqs = computed(() =>
+  props.prerequisites.filter((p) => p.isCrossSet),
+)
+
+const hasCrossSetPrereqs = computed(() => crossSetPrereqs.value.length > 0)
+
+const ghostNodes = computed<GhostNode[]>(() => {
+  const seen = new Set<string>()
+  const ghosts: GhostNode[] = []
+
+  for (const p of crossSetPrereqs.value) {
+    if (seen.has(p.prerequisiteMilestoneId)) continue
+    seen.add(p.prerequisiteMilestoneId)
+
+    const sourceMilestone = props.allMilestones?.find(
+      (m) => m.milestoneId === p.prerequisiteMilestoneId,
+    )
+
+    ghosts.push({
+      milestoneId: p.prerequisiteMilestoneId,
+      title: p.prerequisiteTitle,
+      tier: p.prerequisiteTier,
+      setId: p.resolvedSetId,
+      setTitle: p.resolvedSetTitle,
+      completed: sourceMilestone?.userCompleted,
+    })
+  }
+
+  return ghosts
+})
+
+const ghostMilestones = computed<MilestoneCompletionResponse[]>(() =>
+  ghostNodes.value.map((g) => {
+    const source = props.allMilestones?.find((m) => m.milestoneId === g.milestoneId)
+    if (source) return source
+
+    return {
+      milestoneId: g.milestoneId,
+      title: g.title,
+      description: '',
+      type: 'MILESTONE',
+      tier: g.tier as MilestoneTier,
+      xp: 0,
+      targetValue: 0,
+      comparison: 'GTE',
+      setId: g.setId,
+      categoryId: null,
+      blExclusive: false,
+      completions: 0,
+      totalPlayers: 0,
+      completionPercentage: 0,
+      userCompleted: g.completed,
+    } as MilestoneCompletionResponse
+  }),
+)
+
+const ghostNodeMap = computed(() => {
+  const map = new Map<string, GhostNode>()
+  for (const g of ghostNodes.value) {
+    map.set(g.milestoneId, g)
+  }
+  return map
+})
+
+const localMilestoneIds = computed(() =>
+  new Set(props.milestones.map((m) => m.milestoneId)),
+)
+
 const starPositions = computed<StarLayout[]>(() => {
   const sorted = sortedMilestones.value
   if (sorted.length === 0) return []
 
-  if (props.prerequisites.length === 0) {
+  const allPrereqs = [...intraSetPrereqs.value, ...crossSetPrereqs.value]
+
+  if (allPrereqs.length === 0) {
     const baseRadius = Math.min(35, 15 + sorted.length * 2)
     return sorted.map((m, i) => {
       const angle = (2 * Math.PI * i) / sorted.length - Math.PI / 2
@@ -59,7 +137,7 @@ const starPositions = computed<StarLayout[]>(() => {
   const parentsOf = new Map<string, string[]>()
   const childrenOf = new Map<string, string[]>()
 
-  for (const p of props.prerequisites) {
+  for (const p of allPrereqs) {
     if (!parentsOf.has(p.milestoneId)) parentsOf.set(p.milestoneId, [])
     parentsOf.get(p.milestoneId)!.push(p.prerequisiteMilestoneId)
 
@@ -72,7 +150,7 @@ const starPositions = computed<StarLayout[]>(() => {
     if (visited.has(id)) return 0
     visited.add(id)
     if (depths.has(id)) return depths.get(id)!
-    const parents = parentsOf.get(id) ?? []
+    const parents = (parentsOf.get(id) ?? []).filter((pid) => localMilestoneIds.value.has(pid))
     const d = parents.length === 0 ? 0 : 1 + Math.max(...parents.map((pid) => getDepth(pid, new Set(visited))))
     depths.set(id, d)
     return d
@@ -82,13 +160,13 @@ const starPositions = computed<StarLayout[]>(() => {
   const maxDepth = Math.max(...depths.values(), 0)
 
   const roots = sorted.filter((m) => {
-    const parents = parentsOf.get(m.milestoneId)
-    return !parents || parents.length === 0
+    const parents = (parentsOf.get(m.milestoneId) ?? []).filter((pid) => localMilestoneIds.value.has(pid))
+    return parents.length === 0
   })
 
   const primaryParent = new Map<string, string>()
   for (const m of sorted) {
-    const parents = parentsOf.get(m.milestoneId) ?? []
+    const parents = (parentsOf.get(m.milestoneId) ?? []).filter((pid) => localMilestoneIds.value.has(pid))
     if (parents.length === 0) continue
     if (parents.length === 1) {
       primaryParent.set(m.milestoneId, parents[0])
@@ -112,7 +190,7 @@ const starPositions = computed<StarLayout[]>(() => {
   const weights = new Map<string, number>()
   function getWeight(id: string): number {
     if (weights.has(id)) return weights.get(id)!
-    const children = primaryChildrenOf.get(id) ?? []
+    const children = (primaryChildrenOf.get(id) ?? []).filter((cid) => localMilestoneIds.value.has(cid))
     const w = children.length === 0 ? 1 : children.reduce((s, cid) => s + getWeight(cid), 0)
     weights.set(id, w)
     return w
@@ -124,30 +202,80 @@ const starPositions = computed<StarLayout[]>(() => {
     children.sort((a, b) => (weights.get(b) ?? 1) - (weights.get(a) ?? 1))
   }
 
-  const treeRoots = roots.filter((r) => (weights.get(r.milestoneId) ?? 1) > 1)
-  const loneNodes = roots.filter((r) => (weights.get(r.milestoneId) ?? 1) <= 1)
-  treeRoots.sort((a, b) => (weights.get(b.milestoneId) ?? 1) - (weights.get(a.milestoneId) ?? 1))
-
-  const padding = 10
+  const ghostCount = ghostNodes.value.length
+  const padding = ghostCount > 0 ? 14 : 10
   const xRange = 100 - padding * 2
   const yRange = 100 - padding * 2
   const positions = new Map<string, { x: number; y: number }>()
 
-  function layoutNode(id: string, yMin: number, yMax: number) {
+  function collectComponent(rootId: string): Set<string> {
+    const component = new Set<string>()
+    const queue = [rootId]
+    while (queue.length > 0) {
+      const id = queue.pop()!
+      if (component.has(id) || !localMilestoneIds.value.has(id)) continue
+      component.add(id)
+      for (const cid of primaryChildrenOf.get(id) ?? []) {
+        if (localMilestoneIds.value.has(cid)) queue.push(cid)
+      }
+    }
+    return component
+  }
+
+  interface Component {
+    roots: MilestoneCompletionResponse[]
+    members: Set<string>
+    weight: number
+    maxDepth: number
+  }
+
+  const components: Component[] = []
+  const assigned = new Set<string>()
+
+  for (const root of roots) {
+    if (assigned.has(root.milestoneId)) continue
+    const members = collectComponent(root.milestoneId)
+    for (const id of members) assigned.add(id)
+
+    const componentRoots = roots.filter((r) => members.has(r.milestoneId))
+    const componentWeight = componentRoots.reduce((s, r) => s + (weights.get(r.milestoneId) ?? 1), 0)
+    let componentMaxDepth = 0
+    for (const id of members) {
+      componentMaxDepth = Math.max(componentMaxDepth, depths.get(id) ?? 0)
+    }
+
+    components.push({ roots: componentRoots, members, weight: componentWeight, maxDepth: componentMaxDepth })
+  }
+
+  for (const m of sorted) {
+    if (!assigned.has(m.milestoneId)) {
+      assigned.add(m.milestoneId)
+      components.push({
+        roots: [m],
+        members: new Set([m.milestoneId]),
+        weight: 1,
+        maxDepth: 0,
+      })
+    }
+  }
+
+  components.sort((a, b) => b.weight - a.weight)
+
+  function layoutNode(id: string, yMin: number, yMax: number, compMaxDepth: number) {
     const d = depths.get(id) ?? 0
     const h = hashString(id)
 
-    const baseX = maxDepth === 0 ? 50 : padding + (d / maxDepth) * xRange
-    const xJitter = (seededRandom(h) - 0.5) * 5
-    const x = Math.min(100 - padding, Math.max(padding, baseX + xJitter))
+    const xBase = compMaxDepth === 0 ? 50 : padding + (d / compMaxDepth) * xRange
+    const xNudge = (seededRandom(h) - 0.5) * 2
+    const x = Math.min(100 - padding, Math.max(padding, xBase + xNudge))
 
     const yCenter = (yMin + yMax) / 2
-    const yJitter = (seededRandom(h + 7) - 0.5) * 2
-    const y = Math.min(100 - padding, Math.max(padding, yCenter + yJitter))
+    const yNudge = (seededRandom(h + 7) - 0.5) * 1
+    const y = Math.min(100 - padding, Math.max(padding, yCenter + yNudge))
 
     positions.set(id, { x, y })
 
-    const children = primaryChildrenOf.get(id) ?? []
+    const children = (primaryChildrenOf.get(id) ?? []).filter((cid) => localMilestoneIds.value.has(cid))
     if (children.length === 0) return
 
     const totalWeight = children.reduce((s, cid) => s + (weights.get(cid) ?? 1), 0)
@@ -155,58 +283,28 @@ const starPositions = computed<StarLayout[]>(() => {
     for (const cid of children) {
       const w = weights.get(cid) ?? 1
       const slice = ((yMax - yMin) * w) / totalWeight
-      layoutNode(cid, cursor, cursor + slice)
+      layoutNode(cid, cursor, cursor + slice, compMaxDepth)
       cursor += slice
     }
   }
 
-  if (treeRoots.length > 0) {
-    const totalTreeWeight = treeRoots.reduce((s, r) => s + (weights.get(r.milestoneId) ?? 1), 0)
-    let cursor = padding
-    for (const root of treeRoots) {
+  const totalWeight = components.reduce((s, c) => s + c.weight, 0)
+  let cursor = padding
+  for (const comp of components) {
+    const slice = (yRange * comp.weight) / totalWeight
+    const bandMin = cursor
+    const bandMax = cursor + slice
+
+    const compTotalWeight = comp.roots.reduce((s, r) => s + (weights.get(r.milestoneId) ?? 1), 0)
+    let rootCursor = bandMin
+    for (const root of comp.roots) {
       const w = weights.get(root.milestoneId) ?? 1
-      const slice = (yRange * w) / totalTreeWeight
-      layoutNode(root.milestoneId, cursor, cursor + slice)
-      cursor += slice
-    }
-  }
-
-  if (loneNodes.length > 0) {
-    const edgeSlots: { x: number; y: number }[] = []
-    const count = loneNodes.length
-
-    for (let i = 0; i < count; i++) {
-      const h = hashString(loneNodes[i].milestoneId)
-      const r = seededRandom(h + 10)
-      const side = i % 4
-      let x: number
-      let y: number
-
-      if (side === 0) {
-        x = padding * 0.3 + seededRandom(h + 11) * padding * 0.6
-        y = padding + seededRandom(h + 12) * yRange
-      } else if (side === 1) {
-        x = 100 - padding * 0.3 - seededRandom(h + 13) * padding * 0.6
-        y = padding + seededRandom(h + 14) * yRange
-      } else if (side === 2) {
-        x = padding + seededRandom(h + 15) * xRange
-        y = padding * 0.3 + seededRandom(h + 16) * padding * 0.6
-      } else {
-        x = padding + seededRandom(h + 17) * xRange
-        y = 100 - padding * 0.3 - seededRandom(h + 18) * padding * 0.6
-      }
-
-      x += (r - 0.5) * 3
-      y += (seededRandom(h + 20) - 0.5) * 3
-      x = Math.min(98, Math.max(2, x))
-      y = Math.min(98, Math.max(2, y))
-
-      edgeSlots.push({ x, y })
+      const rootSlice = ((bandMax - bandMin) * w) / compTotalWeight
+      layoutNode(root.milestoneId, rootCursor, rootCursor + rootSlice, comp.maxDepth)
+      rootCursor += rootSlice
     }
 
-    for (let i = 0; i < loneNodes.length; i++) {
-      positions.set(loneNodes[i].milestoneId, edgeSlots[i])
-    }
+    cursor += slice
   }
 
   for (const m of sorted) {
@@ -225,32 +323,61 @@ const starPositions = computed<StarLayout[]>(() => {
   }))
 })
 
-const constellationLines = computed(() => {
-  if (props.prerequisites.length === 0) return []
+const ghostStarPositions = computed<StarLayout[]>(() => {
+  const ghosts = ghostMilestones.value
+  if (ghosts.length === 0) return []
 
-  const posMap = new Map<string, { x: number; y: number }>()
-  for (const star of starPositions.value) {
-    posMap.set(star.milestone.milestoneId, star.position)
-  }
+  const yStep = 80 / (ghosts.length + 1)
 
-  return props.prerequisites
-    .filter((p) => posMap.has(p.prerequisiteMilestoneId) && posMap.has(p.milestoneId))
-    .map((p) => {
-      const from = posMap.get(p.prerequisiteMilestoneId)!
-      const to = posMap.get(p.milestoneId)!
-      return { x1: from.x, y1: from.y, x2: to.x, y2: to.y }
-    })
+  return ghosts.map((m, i) => ({
+    milestone: m,
+    position: {
+      x: 4 + seededRandom(hashString(m.milestoneId) + 30) * 3,
+      y: 10 + yStep * (i + 1) + (seededRandom(hashString(m.milestoneId) + 31) - 0.5) * 4,
+    },
+  }))
 })
 
+const allPositionsMap = computed(() => {
+  const map = new Map<string, { x: number; y: number }>()
+  for (const star of starPositions.value) {
+    map.set(star.milestone.milestoneId, star.position)
+  }
+  for (const star of ghostStarPositions.value) {
+    map.set(star.milestone.milestoneId, star.position)
+  }
+  return map
+})
+
+const intraSetLines = computed(() =>
+  intraSetPrereqs.value
+    .filter((p) => allPositionsMap.value.has(p.prerequisiteMilestoneId) && allPositionsMap.value.has(p.milestoneId))
+    .map((p) => {
+      const from = allPositionsMap.value.get(p.prerequisiteMilestoneId)!
+      const to = allPositionsMap.value.get(p.milestoneId)!
+      return { x1: from.x, y1: from.y, x2: to.x, y2: to.y }
+    }),
+)
+
+const crossSetLines = computed(() =>
+  crossSetPrereqs.value
+    .filter((p) => allPositionsMap.value.has(p.prerequisiteMilestoneId) && allPositionsMap.value.has(p.milestoneId))
+    .map((p) => {
+      const from = allPositionsMap.value.get(p.prerequisiteMilestoneId)!
+      const to = allPositionsMap.value.get(p.milestoneId)!
+      return { x1: from.x, y1: from.y, x2: to.x, y2: to.y }
+    }),
+)
+
 function focusOnStars() {
-  const positions = starPositions.value
-  if (positions.length === 0) return
+  const allStars = [...starPositions.value, ...ghostStarPositions.value]
+  if (allStars.length === 0) return
 
   const el = constellationRef.value
   if (!el) return
 
   let minX = 100, maxX = 0, minY = 100, maxY = 0
-  for (const s of positions) {
+  for (const s of allStars) {
     if (s.position.x < minX) minX = s.position.x
     if (s.position.x > maxX) maxX = s.position.x
     if (s.position.y < minY) minY = s.position.y
@@ -313,17 +440,40 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
         <div class="set-detail__constellation-inner" :style="{ transform: transformStyle }"
           @click.self="pinnedMilestone = null">
           <svg class="set-detail__lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <line v-for="(l, i) in constellationLines" :key="i" :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
+            <line v-for="(l, i) in intraSetLines" :key="`intra-${i}`" :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
               class="set-detail__constellation-line" />
+            <line v-for="(l, i) in crossSetLines" :key="`cross-${i}`" :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
+              class="set-detail__constellation-line set-detail__constellation-line--cross" />
           </svg>
 
           <StarNode v-for="star in starPositions" :key="star.milestone.milestoneId" :milestone="star.milestone"
             :position="star.position" :logged-in="loggedIn"
             @select="pinnedMilestone = pinnedMilestone?.milestoneId === $event.milestoneId ? null : $event"
             @hover="hoveredMilestone = $event" @leave="hoveredMilestone = null" />
+
+          <StarNode v-for="star in ghostStarPositions" :key="`ghost-${star.milestone.milestoneId}`"
+            :milestone="star.milestone" :position="star.position" :logged-in="loggedIn"
+            :ghost="ghostNodeMap.get(star.milestone.milestoneId)" @hover="hoveredMilestone = $event"
+            @leave="hoveredMilestone = null" @navigate-to-set="emit('navigateToSet', $event)" />
         </div>
 
-        <button v-if="Math.abs(scale - 1) > 0.01" class="set-detail__reset-zoom" @click="resetZoom" aria-label="Reset zoom">
+        <div v-if="hasCrossSetPrereqs" class="set-detail__legend">
+          <span class="set-detail__legend-item">
+            <svg width="24" height="2" aria-hidden="true">
+              <line x1="0" y1="1" x2="24" y2="1" stroke="currentColor" stroke-width="1.5" />
+            </svg>
+            Within set
+          </span>
+          <span class="set-detail__legend-item">
+            <svg width="24" height="2" aria-hidden="true">
+              <line x1="0" y1="1" x2="24" y2="1" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" />
+            </svg>
+            From another set
+          </span>
+        </div>
+
+        <button v-if="Math.abs(scale - 1) > 0.01" class="set-detail__reset-zoom" @click="resetZoom"
+          aria-label="Reset zoom">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="8" />
@@ -515,6 +665,40 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   stroke: var(--accent);
   stroke-width: 0.3;
   opacity: 0.25;
+}
+
+.set-detail__constellation-line--cross {
+  stroke-dasharray: 1.5 1.5;
+  opacity: 0.35;
+}
+
+.set-detail__legend {
+  position: absolute;
+  bottom: var(--space-sm);
+  left: var(--space-sm);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-xs) var(--space-sm);
+  background: color-mix(in srgb, var(--bg-base) 80%, transparent);
+  backdrop-filter: blur(4px);
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--bg-overlay);
+}
+
+.set-detail__legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.625rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.set-detail__legend-item svg {
+  color: var(--accent);
+  flex-shrink: 0;
 }
 
 .set-detail__preview {

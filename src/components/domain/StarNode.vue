@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { MilestoneCompletionResponse } from '@/types/api/milestones';
+import type { GhostNode } from '@/types/milestones';
 import { tierColor as getTierColor, TIER_SCALES } from '@/utils/constants';
 import { computed } from 'vue';
 
@@ -7,37 +8,51 @@ const props = defineProps<{
   milestone: MilestoneCompletionResponse
   position: { x: number; y: number }
   loggedIn?: boolean
+  ghost?: GhostNode
 }>()
 
 const emit = defineEmits<{
   select: [milestone: MilestoneCompletionResponse]
   hover: [milestone: MilestoneCompletionResponse]
   leave: []
+  navigateToSet: [setId: string]
 }>()
 
 const tierKey = computed(() => props.milestone.tier.toUpperCase())
 const tierColor = computed(() => getTierColor(props.milestone.tier))
-const tierScale = computed(() => TIER_SCALES[tierKey.value] ?? 1)
+const tierScale = computed(() => (props.ghost ? (TIER_SCALES[tierKey.value] ?? 1) * 0.7 : TIER_SCALES[tierKey.value] ?? 1))
 const isCompleted = computed(() => props.milestone.userCompleted === true)
 const isNotCompleted = computed(() => !!props.loggedIn && !isCompleted.value)
 const isMilestoneType = computed(() => props.milestone.type?.toUpperCase() === 'MILESTONE')
 
 const ariaLabel = computed(() => {
+  if (props.ghost) {
+    return `${props.ghost.title} - ${props.ghost.tier} - from ${props.ghost.setTitle}`
+  }
   const status = isCompleted.value ? 'Completed' : 'Not completed'
   return `${props.milestone.title} - ${props.milestone.tier} - ${status}`
 })
+
+function handleClick() {
+  if (props.ghost) {
+    emit('navigateToSet', props.ghost.setId)
+  } else {
+    emit('select', props.milestone)
+  }
+}
 </script>
 
 <template>
   <button class="star-node" :class="{
     'star-node--completed': isCompleted,
     'star-node--dim': isNotCompleted,
+    'star-node--ghost': !!ghost,
   }" :style="{
     left: `${position.x}%`,
     top: `${position.y}%`,
     '--tier-color': tierColor,
     '--tier-scale': tierScale,
-  }" :aria-label="ariaLabel" tabindex="0" @click="emit('select', milestone)" @pointerenter="emit('hover', milestone)"
+  }" :aria-label="ariaLabel" tabindex="0" @click="handleClick" @pointerenter="emit('hover', milestone)"
     @pointerleave="emit('leave')" @focus="emit('hover', milestone)" @blur="emit('leave')">
     <span class="star-node__glow" />
     <span class="star-node__core">
@@ -55,6 +70,7 @@ const ariaLabel = computed(() => {
         <line x1="7" y1="15" x2="13" y2="15" />
       </svg>
     </span>
+    <span v-if="ghost" class="star-node__set-label">{{ ghost.setTitle }}</span>
   </button>
 </template>
 
@@ -146,6 +162,30 @@ const ariaLabel = computed(() => {
 
 .star-node:hover .star-node__glow {
   opacity: 0.6;
+}
+
+.star-node--ghost {
+  opacity: 0.5;
+}
+
+.star-node--ghost .star-node__core {
+  background: transparent;
+  border: 1.5px dashed var(--tier-color);
+  color: var(--tier-color);
+}
+
+.star-node__set-label {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  pointer-events: none;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 @media (prefers-reduced-motion: reduce) {
