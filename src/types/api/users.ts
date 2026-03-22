@@ -46,6 +46,8 @@ export interface ScoreResponse {
   timeSet: string
   reweightDerivative: boolean
   xpGained: number
+  baseXp: number
+  bonusXp: number
   modifierIds: string[]
   createdAt: string
 }

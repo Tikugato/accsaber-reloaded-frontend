@@ -170,11 +170,12 @@ export interface LevelDisplay {
 export interface TimeSeriesPoint {
   timestamp: number
   value: number
+  tooltipLines?: string[]
 }
 
 export type TimeRange = '24h' | '7d' | '14d' | '30d' | '90d' | '1y' | 'all'
 
-export type MetricType = 'ap' | 'avgAccuracy' | 'rankedPlays' | 'rank' | 'xpCumulative'
+export type MetricType = 'ap' | 'avgAccuracy' | 'rankedPlays' | 'rank' | 'xpCumulative' | 'xpPerAttempt'
 
 export interface ScoreFeedEntry {
   key: string

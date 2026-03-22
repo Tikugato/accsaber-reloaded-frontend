@@ -106,9 +106,17 @@ async function loadChart() {
                 }
                 return ''
               },
-              label: props.formatValue
-                ? (item) => props.formatValue!(item.parsed.y)
-                : undefined,
+              label: (item) => {
+                const point = props.data[item.dataIndex]
+                if (point?.tooltipLines?.length) {
+                  return point.tooltipLines
+                }
+                const y = item.parsed.y ?? 0
+                return props.formatValue
+                  ? props.formatValue(y)
+                  : `${y}`
+              },
+              afterLabel: () => '',
             },
           },
         },

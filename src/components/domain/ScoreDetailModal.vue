@@ -8,7 +8,7 @@ import { useThemeStore } from '@/stores/theme'
 import type { ScoreResponse } from '@/types/api/users'
 import type { MetricType, ScoreDisplay, TimeRange, TimeSeriesPoint } from '@/types/display'
 import { brightenRgb } from '@/utils/color'
-import { BASE_XP_PER_PLAY, SCORE_DETAIL_METRICS, TIME_RANGE_PARAMS } from '@/utils/constants'
+import { SCORE_DETAIL_METRICS, TIME_RANGE_PARAMS } from '@/utils/constants'
 import { formatRelativeDate } from '@/utils/formatters'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -23,7 +23,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
-type ScoreMetric = 'accuracy' | 'ap' | 'xpCumulative'
+type ScoreMetric = 'accuracy' | 'ap' | 'xpCumulative' | 'xpPerAttempt'
 
 const router = useRouter()
 const themeStore = useThemeStore()
@@ -53,9 +53,31 @@ const totalMapXp = computed(() => {
   return historicData.value.reduce((sum, s) => sum + (s.xpGained ?? 0), 0)
 })
 
-const totalBaseXp = computed(() => BASE_XP_PER_PLAY * playCount.value)
+const totalBaseXp = computed(() => {
+  return historicData.value.reduce((sum, s) => sum + (s.baseXp ?? 0), 0)
+})
 
-const totalBonusXp = computed(() => totalMapXp.value - totalBaseXp.value)
+const totalBonusXp = computed(() => {
+  return historicData.value.reduce((sum, s) => sum + (s.bonusXp ?? 0), 0)
+})
+
+function buildTooltipLines(s: ScoreResponse, prev: ScoreResponse | null): string[] {
+  const lines: string[] = []
+  lines.push(`Accuracy: ${(s.accuracy * 100).toFixed(2)}%`)
+  lines.push(`AP: ${s.ap.toFixed(2)}`)
+  lines.push(`XP: ${(s.xpGained ?? 0).toFixed(1)} (${(s.baseXp ?? 0).toFixed(0)} base + ${(s.bonusXp ?? 0).toFixed(1)} bonus)`)
+  if (s.misses > 0) lines.push(`Misses: ${s.misses}`)
+  if (s.rankWhenSet != null) lines.push(`Rank: #${s.rankWhenSet}`)
+  if (prev) {
+    const accDelta = (s.accuracy - prev.accuracy) * 100
+    const apDelta = s.ap - prev.ap
+    const parts: string[] = []
+    if (accDelta !== 0) parts.push(`${accDelta > 0 ? '+' : ''}${accDelta.toFixed(2)}% acc`)
+    if (apDelta !== 0) parts.push(`${apDelta > 0 ? '+' : ''}${apDelta.toFixed(2)} AP`)
+    if (parts.length > 0) lines.push(`Δ ${parts.join(', ')}`)
+  }
+  return lines
+}
 
 const chartPoints = computed<TimeSeriesPoint[]>(() => {
   const sorted = [...historicData.value].sort(
@@ -64,21 +86,34 @@ const chartPoints = computed<TimeSeriesPoint[]>(() => {
 
   if (selectedMetric.value === 'xpCumulative') {
     let cumulative = 0
-    return sorted.map((s) => {
+    return sorted.map((s, i) => {
       cumulative += s.xpGained ?? 0
-      return { timestamp: new Date(s.timeSet).getTime(), value: cumulative }
+      return {
+        timestamp: new Date(s.timeSet).getTime(),
+        value: cumulative,
+        tooltipLines: buildTooltipLines(s, i > 0 ? sorted[i - 1] : null),
+      }
     })
   }
 
-  return sorted.map((s) => ({
+  if (selectedMetric.value === 'xpPerAttempt') {
+    return sorted.map((s, i) => ({
+      timestamp: new Date(s.timeSet).getTime(),
+      value: s.xpGained ?? 0,
+      tooltipLines: buildTooltipLines(s, i > 0 ? sorted[i - 1] : null),
+    }))
+  }
+
+  return sorted.map((s, i) => ({
     timestamp: new Date(s.timeSet).getTime(),
     value: selectedMetric.value === 'accuracy' ? s.accuracy * 100 : s.ap,
+    tooltipLines: buildTooltipLines(s, i > 0 ? sorted[i - 1] : null),
   }))
 })
 
 const chartFormatValue = computed(() => {
   if (selectedMetric.value === 'accuracy') return (v: number) => `${v.toFixed(2)}%`
-  if (selectedMetric.value === 'xpCumulative') return (v: number) => `${v.toFixed(1)} XP`
+  if (selectedMetric.value === 'xpCumulative' || selectedMetric.value === 'xpPerAttempt') return (v: number) => `${v.toFixed(1)} XP`
   return undefined
 })
 
@@ -151,11 +186,11 @@ watch(
               <span class="score-detail__xp-tooltip">
                 <span class="score-detail__xp-tooltip-row">
                   <span class="score-detail__xp-tooltip-label">Base XP</span>
-                  <span class="score-detail__xp-tooltip-value">{{ BASE_XP_PER_PLAY }} &times; {{ playCount }} (attempts) = {{ totalBaseXp.toFixed(1) }}</span>
+                  <span class="score-detail__xp-tooltip-value">{{ totalBaseXp.toFixed(1) }}</span>
                 </span>
                 <span class="score-detail__xp-tooltip-row">
                   <span class="score-detail__xp-tooltip-label">Bonus XP</span>
-                  <span class="score-detail__xp-tooltip-value"><span class="score-detail__xp-tooltip-hint">(XP Curve)</span> <span class="score-detail__xp-tooltip-value--bonus">{{ totalBonusXp.toFixed(1) }}</span></span>
+                  <span class="score-detail__xp-tooltip-value"><span class="score-detail__xp-tooltip-value--bonus">{{ totalBonusXp.toFixed(1) }}</span></span>
                 </span>
                 <span class="score-detail__xp-tooltip-divider" />
                 <span class="score-detail__xp-tooltip-row">
