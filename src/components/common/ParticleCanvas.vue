@@ -198,7 +198,7 @@ function loop(time: number) {
 function onMouseMove(e: MouseEvent) {
   if (!canvasRef.value) return
   const rect = canvasRef.value.getBoundingClientRect()
-  const x = e.clientX - rect.left + 25
+  const x = e.clientX - rect.left
   const y = e.clientY - rect.top
   if (x >= -radius && x <= rect.width + radius && y >= -radius && y <= rect.height + radius) {
     mouseX = x
@@ -267,6 +267,7 @@ onUnmounted(() => {
 <style scoped>
 .particle-canvas {
   position: absolute;
+  max-width: none;
   inset: -40px -60px -80px -60px;
   pointer-events: none;
   z-index: 0;
