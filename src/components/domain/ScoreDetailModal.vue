@@ -45,7 +45,7 @@ const resolvedAccent = computed(() => {
 
 const historicData = ref<ScoreResponse[]>([])
 const selectedMetric = ref<ScoreMetric>('accuracy')
-const selectedRange = ref<TimeRange>('7d')
+const selectedRange = ref<TimeRange>('14d')
 
 const playCount = computed(() => historicData.value.length)
 

@@ -14,7 +14,7 @@ const props = defineProps<{
 
 const categoryStore = useCategoryStore()
 const selectedMetric = ref<MetricType>('ap')
-const selectedRange = ref<TimeRange>('7d')
+const selectedRange = ref<TimeRange>('14d')
 const chartData = ref<UserCategoryStatisticsResponse[]>([])
 const chartLoading = ref(false)
 const allTimeData = ref<UserCategoryStatisticsResponse[]>([])

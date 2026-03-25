@@ -84,7 +84,7 @@ const breadcrumbs = computed(() => [
 ])
 
 const selectedStatsMetric = ref<MetricType>('ap')
-const selectedStatsRange = ref<TimeRange>('7d')
+const selectedStatsRange = ref<TimeRange>('14d')
 
 
 const statsChartPoints = computed<TimeSeriesPoint[]>(() => {

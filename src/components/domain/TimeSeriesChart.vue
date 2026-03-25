@@ -39,7 +39,7 @@ const timeRanges: { key: TimeRange; label: string }[] = [
   { key: 'all', label: 'All' },
 ]
 
-const activeRange = computed(() => props.selectedRange ?? '7d')
+const activeRange = computed(() => props.selectedRange ?? '14d')
 
 async function loadChart() {
   isLoading.value = true
