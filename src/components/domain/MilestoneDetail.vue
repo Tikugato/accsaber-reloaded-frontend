@@ -22,8 +22,7 @@ const blTooltip = computed(() => `This ${typeLabel.value} is exclusive to player
 const expanded = ref(false)
 
 const completionText = computed(() => {
-  const { completions, totalPlayers, completionPercentage } = props.milestone
-  return `${completions ?? 0}/${totalPlayers ?? 0} players (${formatPercent(completionPercentage ?? 0)}%)`
+  return `${formatPercent(props.milestone.completionPercentage ?? 0)}% of players`
 })
 
 const showHolderTooltip = computed(() => (props.milestone.completions ?? 0) > 0 && (props.milestone.completions ?? 0) < 50)
@@ -106,10 +105,13 @@ function toggleExpand() {
         <span class="milestone-detail__completion">{{ completionText }}</span>
         <MilestoneHolderTooltip v-if="showHolderTooltip" :milestone-id="milestone.milestoneId"
           :completions="milestone.completions ?? 0" />
-        <svg v-if="isCompleted" class="milestone-detail__check-icon" viewBox="0 0 20 20" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polyline points="4 10 8 14 16 6" />
-        </svg>
+        <span v-if="isCompleted" class="milestone-detail__completed-inline">
+          <svg class="milestone-detail__check-icon" viewBox="0 0 20 20" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="4 10 8 14 16 6" />
+          </svg>
+          <span v-if="completedAtFormatted" class="milestone-detail__completed-date">{{ completedAtFormatted }}</span>
+        </span>
         <svg v-if="hasScoreInfo" class="milestone-detail__chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <polyline points="6 8 10 12 14 8" />
@@ -402,6 +404,19 @@ function toggleExpand() {
   gap: var(--space-md);
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.milestone-detail__completed-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--success);
+}
+
+.milestone-detail__completed-date {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  white-space: nowrap;
 }
 
 .milestone-detail__compact-meta .milestone-detail__check-icon {
