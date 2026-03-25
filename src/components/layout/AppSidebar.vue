@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import PseudoLoginModal from '@/components/domain/PseudoLoginModal.vue'
+import ExtraSidebarActions from '@/components/layout/ExtraSidebarActions.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import { ref } from 'vue'
@@ -17,6 +18,7 @@ const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const loginModalOpen = ref(false)
+const mobileMenuOpen = ref(false)
 
 function handleUserClick() {
   if (authStore.isLoggedIn && authStore.userId) {
@@ -128,85 +130,10 @@ function isActive(to: string): boolean {
     </div>
 
     <div class="sidebar__bottom">
-      <component
-        :is="authStore.isLoggedIn && authStore.userId ? 'router-link' : 'button'"
-        :key="authStore.isLoggedIn ? 'profile-link' : 'login-btn'"
-        :to="authStore.isLoggedIn && authStore.userId ? { name: 'player-profile', params: { userId: authStore.userId } } : undefined"
-        class="sidebar__item sidebar__user-btn"
-        aria-label="User profile"
-        @click="!authStore.isLoggedIn && (loginModalOpen = true)"
-      >
-        <span class="sidebar__icon">
-          <img v-if="authStore.isLoggedIn && authStore.userProfile?.avatarUrl" :src="authStore.userProfile.avatarUrl"
-            :alt="authStore.userProfile.name" class="sidebar__user-avatar" />
-          <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-        </span>
-        <span class="sidebar__label">
-          {{ authStore.isLoggedIn && authStore.userProfile ? authStore.userProfile.name : 'Log In' }}
-        </span>
-        <span class="sidebar__tooltip">
-          {{ authStore.isLoggedIn && authStore.userProfile ? authStore.userProfile.name : 'Log In' }}
-        </span>
-      </component>
-
-      <button v-if="authStore.isLoggedIn" class="sidebar__item sidebar__logout-btn" aria-label="Log out"
-        @click="authStore.clearUserId()">
-        <span class="sidebar__icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-        </span>
-        <span class="sidebar__label">Log Out</span>
-        <span class="sidebar__tooltip">Log Out</span>
-      </button>
-
-      <button v-if="authStore.isStaffAuthenticated && authStore.isAdmin" class="sidebar__item sidebar__logout-btn"
-        aria-label="Staff log out" @click="authStore.logout()">
-        <span class="sidebar__icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
-        </span>
-        <span class="sidebar__label">Staff Logout</span>
-        <span class="sidebar__tooltip">Staff Logout</span>
-      </button>
-
-      <button class="sidebar__item sidebar__theme-toggle"
-        :aria-label="theme.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'" @click="theme.toggle()">
-        <span class="sidebar__icon">
-          <svg v-if="theme.theme === 'dark'" width="20" height="20" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="5" />
-            <line x1="12" y1="1" x2="12" y2="3" />
-            <line x1="12" y1="21" x2="12" y2="23" />
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-            <line x1="1" y1="12" x2="3" y2="12" />
-            <line x1="21" y1="12" x2="23" y2="12" />
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-          </svg>
-          <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-          </svg>
-        </span>
-        <span class="sidebar__label">
-          {{ theme.theme === 'dark' ? 'Light mode' : 'Dark mode' }}
-        </span>
-        <span class="sidebar__tooltip">
-          {{ theme.theme === 'dark' ? 'Light mode' : 'Dark mode' }}
-        </span>
-      </button>
+      <ExtraSidebarActions 
+        @action="mobileMenuOpen = false"
+        @login="loginModalOpen = true; mobileMenuOpen = false" 
+      />
 
       <button class="sidebar__item sidebar__collapse-toggle"
         :aria-label="props.collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
@@ -226,10 +153,31 @@ function isActive(to: string): boolean {
     </div>
   </nav>
 
+  <div v-if="mobileMenuOpen" class="mobile__backdrop" @click="mobileMenuOpen = false"></div>
+  
+  <button class="mobile__btn" aria-label="Mobile Menu" @click="mobileMenuOpen = !mobileMenuOpen">
+    <svg v-if="!mobileMenuOpen" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+    <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  </button>
+
+  <div class="mobile__dropdown" :class="{ 'mobile__dropdown--open': mobileMenuOpen }">
+    <ExtraSidebarActions 
+      @action="mobileMenuOpen = false"
+      @login="loginModalOpen = true; mobileMenuOpen = false" 
+    />
+  </div>
+
   <PseudoLoginModal :open="loginModalOpen" @close="loginModalOpen = false" />
 </template>
 
-<style scoped>
+<style>
 .sidebar {
   position: fixed;
   left: 0;
@@ -386,6 +334,12 @@ function isActive(to: string): boolean {
   margin: 0;
 }
 
+.mobile__btn,
+.mobile__backdrop,
+.mobile__dropdown {
+  display: none;
+}
+
 @media (max-width: 767px) {
   .sidebar {
     position: fixed;
@@ -435,6 +389,80 @@ function isActive(to: string): boolean {
 
   .sidebar__tooltip {
     display: none !important;
+  }
+
+  .mobile__btn {
+    display: flex;
+    position: fixed;
+    top: var(--space-md, 16px);
+    right: var(--space-md, 16px);
+    z-index: 102;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-btn);
+    background: color-mix(in srgb, var(--bg-surface) 85%, transparent);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--bg-overlay);
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transition: all 150ms ease;
+  }
+
+  .mobile__backdrop {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+  }
+
+  .mobile__dropdown {
+    display: flex;
+    position: fixed;
+    top: calc(var(--space-md, 16px) + 52px);
+    right: var(--space-md, 16px);
+    background: color-mix(in srgb, var(--bg-surface) 95%, transparent);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--bg-overlay);
+    border-radius: var(--radius-md);
+    padding: var(--space-xs, 8px) 0;
+    flex-direction: column;
+    z-index: 101;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-10px);
+    transition: all 200ms ease;
+    min-width: 200px;
+  }
+
+  .mobile__dropdown--open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .mobile__dropdown .sidebar__item {
+    justify-content: flex-start;
+    padding: 0 var(--space-md, 16px);
+    height: 48px;
+    flex: none;
+    width: 100%;
+    text-decoration: none;
+  }
+
+  .mobile__dropdown .sidebar__label {
+    display: block;
+    color: var(--text-secondary);
+  }
+  
+  .mobile__dropdown .sidebar__item:hover .sidebar__label {
+    color: var(--text-primary);
   }
 }
 </style>
