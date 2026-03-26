@@ -138,7 +138,7 @@ function isActive(to: string): boolean {
     </div>
 
     <div class="sidebar__bottom">
-      <ExtraSidebarActions :mobile-nav-items="mobileDropdownItems" @action="mobileMenuOpen = false"
+      <ExtraSidebarActions @action="mobileMenuOpen = false"
         @login="loginModalOpen = true; mobileMenuOpen = false" />
 
       <button class="sidebar__item sidebar__collapse-toggle"
