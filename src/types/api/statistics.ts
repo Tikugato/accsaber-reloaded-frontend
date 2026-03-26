@@ -10,6 +10,8 @@ export interface MapAvgApResponse {
   categoryName: string
   averageAp: number
   scoreCount: number
+  latestScoreId: string
+  latestScoreTimeSet: string
 }
 
 export interface MapRetryResponse {
@@ -23,6 +25,8 @@ export interface MapRetryResponse {
   categoryId: string
   categoryName: string
   supersededCount: number
+  latestScoreId: string
+  latestScoreTimeSet: string
 }
 
 export interface UserImprovementsResponse {
@@ -31,6 +35,8 @@ export interface UserImprovementsResponse {
   avatarUrl: string
   country: string
   improvementCount: number
+  latestScoreId: string
+  latestScoreTimeSet: string
 }
 
 export interface UserMapImprovementsResponse {
@@ -48,6 +54,8 @@ export interface UserMapImprovementsResponse {
   categoryId: string
   categoryName: string
   improvementCount: number
+  latestScoreId: string
+  latestScoreTimeSet: string
 }
 
 export interface MilestoneCollectorResponse {

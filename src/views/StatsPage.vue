@@ -123,23 +123,27 @@ const COLUMNS: Record<LeaderboardTab, TableColumn[]> = {
     { key: 'categoryName', label: 'Category', align: 'left', width: '130px' },
     { key: 'averageAp', label: 'Avg AP', align: 'right', mono: true, width: '110px' },
     { key: 'scoreCount', label: 'Scores', align: 'right', mono: true, width: '100px' },
+    { key: 'latestScoreTimeSet', label: 'Latest', align: 'right', width: '110px' },
   ],
   'most-retried': [
     { key: 'rank', label: '#', align: 'right', mono: true, width: '60px' },
     { key: 'map', label: 'Map', align: 'left' },
     { key: 'categoryName', label: 'Category', align: 'left', width: '130px' },
     { key: 'supersededCount', label: 'Retries', align: 'right', mono: true, width: '110px' },
+    { key: 'latestScoreTimeSet', label: 'Latest', align: 'right', width: '110px' },
   ],
   'grinders': [
     { key: 'rank', label: '#', align: 'right', mono: true, width: '60px' },
     { key: 'player', label: 'Player', align: 'left' },
     { key: 'improvementCount', label: 'Improvements', align: 'right', mono: true, width: '140px' },
+    { key: 'latestScoreTimeSet', label: 'Latest', align: 'right', width: '110px' },
   ],
   'dedication': [
     { key: 'rank', label: '#', align: 'right', mono: true, width: '60px' },
     { key: 'player', label: 'Player', align: 'left' },
     { key: 'map', label: 'Map', align: 'left' },
     { key: 'improvementCount', label: 'Improvements', align: 'right', mono: true, width: '140px' },
+    { key: 'latestScoreTimeSet', label: 'Latest', align: 'right', width: '110px' },
   ],
   'collectors': [
     { key: 'rank', label: '#', align: 'right', mono: true, width: '60px' },
@@ -441,8 +445,8 @@ watch(() => categoryStore.loaded, (loaded, wasLoaded) => {
           <template #cell-milestoneCount="{ value }"><span class="stat-accent">{{ (value as number).toLocaleString()
               }}</span></template>
           <template #cell-scoreCount="{ value }">{{ (value as number).toLocaleString() }}</template>
-          <template #cell-timeSet="{ value }"><span class="date-cell">{{ formatRelativeDate(value as string)
-              }}</span></template>
+          <template #cell-timeSet="{ value }"><span class="date-cell">{{ formatRelativeDate(value as string) }}</span></template>
+          <template #cell-latestScoreTimeSet="{ value }"><span class="date-cell">{{ formatRelativeDate(value as string) }}</span></template>
 
           <template #cell-detail="{ row }">
             <button v-if="isScoreTab" class="detail-btn" aria-label="View score details"
