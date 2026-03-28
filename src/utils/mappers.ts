@@ -26,6 +26,7 @@ export function toPlayerDisplay(entry: LeaderboardResponse): PlayerDisplay {
     ap: entry.ap,
     avgAccuracy: entry.averageAcc,
     rankedPlays: entry.rankedPlays,
+    ssInactive: entry.ssInactive,
   }
 }
 
@@ -40,6 +41,7 @@ export function toXpPlayerDisplay(entry: XpLeaderboardResponse): XpPlayerDisplay
     rankChange: entry.rankingLastWeek != null ? entry.rankingLastWeek - entry.ranking : null,
     totalXp: entry.totalXp,
     level: entry.level,
+    ssInactive: entry.ssInactive,
   }
 }
 

@@ -65,6 +65,7 @@ const countryFilter = computed<string>({
 })
 
 const searchQuery = ref('')
+const showInactive = ref(true)
 const loading = ref(false)
 const apPageData = ref<Page<LeaderboardResponse> | null>(null)
 const xpPageData = ref<Page<XpLeaderboardResponse> | null>(null)
@@ -85,6 +86,7 @@ const rows = computed(() => {
         avatarUrl: p.avatarUrl,
         totalXp: p.totalXp,
         level: p.level,
+        ssInactive: p.ssInactive,
       }
     })
   }
@@ -102,6 +104,7 @@ const rows = computed(() => {
       ap: p.ap,
       avgAccuracy: p.avgAccuracy,
       rankedPlays: p.rankedPlays,
+      ssInactive: p.ssInactive,
     }
   })
 })
@@ -146,12 +149,14 @@ const countryOptions = computed(() => {
 async function fetchData() {
   loading.value = true
   try {
+    const inactiveUsers = showInactive.value ? undefined : false
     if (isXpMode.value) {
       const { getXpLeaderboard } = await import('@/api/leaderboards')
       const params = {
         ...paginationParams.value,
         search: searchQuery.value.trim() || undefined,
         country: countryFilter.value || undefined,
+        inactiveUsers,
       }
       xpPageData.value = await getXpLeaderboard(params)
     } else {
@@ -161,7 +166,7 @@ async function fetchData() {
         return
       }
       const { getLeaderboard, getCountryLeaderboard } = await import('@/api/leaderboards')
-      const params = { ...paginationParams.value, search: searchQuery.value.trim() || undefined }
+      const params = { ...paginationParams.value, search: searchQuery.value.trim() || undefined, inactiveUsers }
       if (countryFilter.value) {
         apPageData.value = await getCountryLeaderboard(categoryId, countryFilter.value, params)
       } else {
@@ -192,6 +197,7 @@ function rowClass(row: Record<string, unknown>): Record<string, boolean> {
   return {
     'data-table__row--highlighted': row.userId === highlightedUserId.value,
     'data-table__row--self-highlight': !!authStore.userId && row.userId === authStore.userId,
+    'data-table__row--inactive': !!row.ssInactive,
   }
 }
 
@@ -218,7 +224,7 @@ function handleCountryChange(country: string) {
 watch(searchQuery, () => { resetPage() })
 
 watch(
-  [activeCategory, paginationParams, countryFilter, searchQuery],
+  [activeCategory, paginationParams, countryFilter, searchQuery, showInactive],
   () => { fetchData() },
   { immediate: true },
 )
@@ -243,6 +249,13 @@ watch(() => categoryStore.loaded, (loaded) => {
     <div class="leaderboards__controls">
       <CategoryTabs :model-value="activeCategory" @update:model-value="handleCategoryChange" />
       <div class="leaderboards__filter">
+        <button class="leaderboards__inactive-toggle" :class="{ 'leaderboards__inactive-toggle--active': showInactive }"
+          :aria-pressed="showInactive" aria-label="Show inactive players" @click="showInactive = !showInactive">
+          <span class="leaderboards__inactive-track">
+            <span class="leaderboards__inactive-thumb" />
+          </span>
+          <span class="leaderboards__inactive-label">Inactive</span>
+        </button>
         <SearchBox v-model="searchQuery" placeholder="Search players..." />
         <BaseSelect :model-value="countryFilter" :options="countryOptions" placeholder="All Countries" searchable
           @update:model-value="handleCountryChange" />
@@ -297,6 +310,7 @@ watch(() => categoryStore.loaded, (loaded) => {
             :class="[
               { 'lb-card--highlighted': row.userId === highlightedUserId },
               { 'lb-card--self-highlight': !!authStore.userId && row.userId === authStore.userId },
+              { 'lb-card--inactive': !!row.ssInactive },
               rowClass(row)
             ]" :data-user-id="row.userId">
             <span class="lb-card__rank rank-cell"
@@ -372,6 +386,56 @@ watch(() => categoryStore.loaded, (loaded) => {
   gap: var(--space-md);
 }
 
+.leaderboards__inactive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+
+.leaderboards__inactive-track {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--text-tertiary);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.leaderboards__inactive-toggle--active .leaderboards__inactive-track {
+  background: color-mix(in srgb, var(--page-accent) 40%, transparent);
+  border-color: var(--page-accent);
+}
+
+.leaderboards__inactive-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.leaderboards__inactive-toggle--active .leaderboards__inactive-thumb {
+  transform: translateX(12px);
+  background: var(--page-accent);
+}
+
+.leaderboards__inactive-label {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  user-select: none;
+}
+
 .leaderboards__filter {
   display: flex;
   align-items: center;
@@ -403,6 +467,10 @@ watch(() => categoryStore.loaded, (loaded) => {
 :deep(.data-table__row--self-highlight) {
   background: color-mix(in srgb, var(--page-accent) 8%, var(--bg-surface));
   border-left: 2px solid color-mix(in srgb, var(--page-accent) 40%, transparent);
+}
+
+:deep(.data-table__row--inactive) {
+  opacity: 0.45;
 }
 
 @keyframes row-highlight {
@@ -494,6 +562,10 @@ watch(() => categoryStore.loaded, (loaded) => {
 .lb-card--self-highlight {
   background: color-mix(in srgb, var(--page-accent) 8%, var(--bg-surface));
   border-left-color: color-mix(in srgb, var(--page-accent) 40%, transparent);
+}
+
+.lb-card--inactive {
+  opacity: 0.45;
 }
 
 @media (max-width: 767px) {

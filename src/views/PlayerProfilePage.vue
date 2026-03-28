@@ -240,6 +240,7 @@ watch(activeCategory, (newCategory) => {
           <div class="profile-hero__name-row">
             <h1 class="profile-hero__name">{{ user.name }}</h1>
             <CountryFlag :country="user.country" />
+            <span v-if="user.ssInactive" class="profile-hero__inactive-badge">Inactive</span>
           </div>
 
           <CategoryTabs :model-value="activeCategory" :exclude="['xp']" @update:model-value="activeCategory = $event" />
@@ -470,6 +471,17 @@ watch(activeCategory, (newCategory) => {
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+}
+
+.profile-hero__inactive-badge {
+  font-size: var(--text-caption);
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: color-mix(in srgb, var(--bg-overlay) 60%, transparent);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--bg-overlay);
+  letter-spacing: 0.03em;
 }
 
 .profile-hero__stats {
