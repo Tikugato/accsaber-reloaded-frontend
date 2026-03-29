@@ -1,4 +1,4 @@
-import type { PrerequisiteLinkResponse } from './api/milestones'
+import type { MilestoneSetResponse, PrerequisiteLinkResponse, SetGroupResponse } from './api/milestones'
 
 export interface EnrichedPrerequisite extends PrerequisiteLinkResponse {
   isCrossSet: boolean
@@ -10,6 +10,11 @@ export interface CrossSetEdge {
   fromSetId: string
   toSetId: string
   count: number
+}
+
+export interface ResolvedSetGroup {
+  group: SetGroupResponse
+  sets: MilestoneSetResponse[]
 }
 
 export interface GhostNode {

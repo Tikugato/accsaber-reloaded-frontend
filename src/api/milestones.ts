@@ -5,6 +5,8 @@ import type {
   MilestoneResponse,
   MilestoneSetResponse,
   PrerequisiteLinkResponse,
+  SetGroupLinkResponse,
+  SetGroupResponse,
 } from '@/types/api/milestones'
 import type { Page, PaginationParams } from '@/types/pagination'
 import { get } from './client'
@@ -38,6 +40,14 @@ export function getSetPrerequisites(setId: string): Promise<PrerequisiteLinkResp
 
 export function getMilestoneHolders(milestoneId: string): Promise<Page<MilestoneHolderResponse>> {
   return get<Page<MilestoneHolderResponse>>(`/milestones/${milestoneId}/holders?size=50`)
+}
+
+export function getSetGroups(): Promise<SetGroupResponse[]> {
+  return get<SetGroupResponse[]>('/milestones/set-groups')
+}
+
+export function getSetGroupLinks(groupId: string): Promise<SetGroupLinkResponse[]> {
+  return get<SetGroupLinkResponse[]>(`/milestones/set-groups/${groupId}/links`)
 }
 
 export type MilestoneSort = 'tier' | 'completions' | 'completedAt'

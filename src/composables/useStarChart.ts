@@ -27,7 +27,7 @@ export interface Highway {
   opacity: number
 }
 
-function scatterPosition(
+export function scatterPosition(
   index: number,
   totalCount: number,
   width: number,
@@ -57,35 +57,38 @@ function scatterPosition(
   }
 }
 
-export { scatterPosition }
+export interface SetGroupCluster {
+  groupId: string
+  groupName: string
+  setIds: string[]
+}
 
 export function useStarChart(
   sets: Ref<MilestoneSetResponse[]>,
   milestonesBySet: Ref<Map<string, MilestoneCompletionResponse[]>>,
 ) {
-  function computeSetPositions(containerWidth: number, containerHeight: number, lockedCount = 0): SetNodeLayout[] {
-    if (sets.value.length === 0) return []
+  function buildNode(set: MilestoneSetResponse, position: Position): SetNodeLayout {
+    const milestones = milestonesBySet.value.get(set.id) ?? []
+    const completedCount = milestones.filter((m) => m.userCompleted === true).length
+    const completionPct = milestones.length > 0
+      ? (completedCount / milestones.length) * 100
+      : 0
+    return {
+      id: set.id,
+      set,
+      position,
+      milestoneCount: milestones.length,
+      completionPercentage: set.userCompletionPercentage ?? completionPct,
+    }
+  }
 
-    const sorted = [...sets.value].sort((a, b) => a.title.localeCompare(b.title))
-    const totalCount = sorted.length + lockedCount
-
-    const nodes = sorted.map((set, i) => {
-      const milestones = milestonesBySet.value.get(set.id) ?? []
-      const completedCount = milestones.filter((m) => m.userCompleted === true).length
-      const completionPct = milestones.length > 0
-        ? (completedCount / milestones.length) * 100
-        : 0
-
-      return {
-        id: set.id,
-        set,
-        position: scatterPosition(i, totalCount, containerWidth, containerHeight, hashString(set.id)),
-        milestoneCount: milestones.length,
-        completionPercentage: set.userCompletionPercentage ?? completionPct,
-      }
-    })
-
+  function separateOverlaps(nodes: SetNodeLayout[], containerWidth: number, containerHeight: number, regionX?: number, regionW?: number) {
     const minDist = 70
+    const padX = regionX ?? containerWidth * 0.1
+    const maxX = regionX !== undefined && regionW !== undefined ? regionX + regionW : containerWidth - containerWidth * 0.1
+    const padY = containerHeight * 0.15
+    const maxY = containerHeight - padY
+
     for (let pass = 0; pass < 3; pass++) {
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
@@ -96,19 +99,80 @@ export function useStarChart(
           const dist = Math.sqrt(dx * dx + dy * dy)
           if (dist >= minDist || dist === 0) continue
 
-          const padX = containerWidth * 0.1
-          const padY = containerHeight * 0.15
           const overlap = (minDist - dist) / 2
           const nx = dx / dist
           const ny = dy / dist
-          a.x = Math.max(padX, Math.min(containerWidth - padX, a.x - nx * overlap))
-          a.y = Math.max(padY, Math.min(containerHeight - padY, a.y - ny * overlap))
-          b.x = Math.max(padX, Math.min(containerWidth - padX, b.x + nx * overlap))
-          b.y = Math.max(padY, Math.min(containerHeight - padY, b.y + ny * overlap))
+          a.x = Math.max(padX, Math.min(maxX, a.x - nx * overlap))
+          a.y = Math.max(padY, Math.min(maxY, a.y - ny * overlap))
+          b.x = Math.max(padX, Math.min(maxX, b.x + nx * overlap))
+          b.y = Math.max(padY, Math.min(maxY, b.y + ny * overlap))
         }
       }
     }
+  }
 
+  function computeSetPositions(containerWidth: number, containerHeight: number, lockedCount = 0, groups?: SetGroupCluster[]): SetNodeLayout[] {
+    if (sets.value.length === 0) return []
+
+    if (!groups || groups.length === 0) {
+      return computeUngroupedPositions(containerWidth, containerHeight, lockedCount)
+    }
+
+    const setMap = new Map<string, MilestoneSetResponse>()
+    for (const s of sets.value) setMap.set(s.id, s)
+
+    const groupedIds = new Set<string>()
+    for (const g of groups) {
+      for (const id of g.setIds) groupedIds.add(id)
+    }
+
+    const standaloneSets = sets.value.filter((s) => !groupedIds.has(s.id))
+
+    const segments: { setIds: string[] }[] = groups.map((g) => ({
+      setIds: g.setIds.filter((id) => setMap.has(id)),
+    }))
+    if (standaloneSets.length > 0) {
+      segments.push({ setIds: standaloneSets.map((s) => s.id) })
+    }
+    if (lockedCount > 0) {
+      segments.push({ setIds: Array.from({ length: lockedCount }, (_, i) => `__locked_${i}`) })
+    }
+
+    const totalWeight = segments.reduce((sum, s) => sum + Math.max(s.setIds.length, 1), 0)
+    const padX = containerWidth * 0.06
+    const usableW = containerWidth - padX * 2
+    const allNodes: SetNodeLayout[] = []
+    let cursorX = padX
+
+    for (const seg of segments) {
+      const segW = (Math.max(seg.setIds.length, 1) / totalWeight) * usableW
+      const resolvedSets = seg.setIds
+        .map((id) => setMap.get(id))
+        .filter((s): s is MilestoneSetResponse => s !== undefined)
+
+      const nodes = resolvedSets.map((set, i) => {
+        const pos = scatterPosition(i, resolvedSets.length, segW, containerHeight, hashString(set.id))
+        pos.x += cursorX
+        return buildNode(set, pos)
+      })
+
+      separateOverlaps(nodes, containerWidth, containerHeight, cursorX, segW)
+      allNodes.push(...nodes)
+      cursorX += segW
+    }
+
+    return allNodes
+  }
+
+  function computeUngroupedPositions(containerWidth: number, containerHeight: number, lockedCount: number): SetNodeLayout[] {
+    const sorted = [...sets.value].sort((a, b) => a.title.localeCompare(b.title))
+    const totalCount = sorted.length + lockedCount
+
+    const nodes = sorted.map((set, i) =>
+      buildNode(set, scatterPosition(i, totalCount, containerWidth, containerHeight, hashString(set.id))),
+    )
+
+    separateOverlaps(nodes, containerWidth, containerHeight)
     return nodes
   }
 

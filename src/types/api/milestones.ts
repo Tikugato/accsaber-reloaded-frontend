@@ -89,6 +89,23 @@ export interface MilestoneHolderResponse {
   completedAt: string
 }
 
+export interface SetGroupResponse {
+  id: string
+  name: string
+  description: string
+  createdAt: string
+}
+
+export interface SetGroupLinkResponse {
+  id: string
+  groupId: string
+  groupName: string
+  setId: string
+  setTitle: string
+  sortOrder: number
+  createdAt: string
+}
+
 export interface ActivateMilestonesRequest {
   milestoneIds: string[]
 }

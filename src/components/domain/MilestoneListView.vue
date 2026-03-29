@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import type { MilestoneSort } from '@/api/milestones'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 import BaseTabs from '@/components/common/BaseTabs.vue'
 import SkeletonLoader from '@/components/common/SkeletonLoader.vue'
 import MilestoneDetail from '@/components/domain/MilestoneDetail.vue'
-import type { MilestoneSort } from '@/api/milestones'
 import type { MilestoneCompletionResponse, MilestoneSetResponse } from '@/types/api/milestones'
 import type { Tab } from '@/types/display'
-import { computed, ref, watch, watchEffect } from 'vue'
+import type { ResolvedSetGroup } from '@/types/milestones'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{
   milestones: MilestoneCompletionResponse[]
@@ -14,6 +15,8 @@ const props = defineProps<{
   sort?: MilestoneSort
   loading?: boolean
   loggedIn?: boolean
+  groups?: ResolvedSetGroup[]
+  standaloneSets?: MilestoneSetResponse[]
 }>()
 
 const emit = defineEmits<{
@@ -73,31 +76,81 @@ const activeMilestones = computed(() =>
 
 const isFlatSort = computed(() => activeSort.value !== 'tier')
 
-const groups = computed<MilestoneGroup[]>(() => {
-  const setMap = new Map<string, MilestoneSetResponse>()
-  for (const s of props.sets) setMap.set(s.id, s)
+function buildMilestoneGroup(setId: string, setInfo: MilestoneSetResponse | undefined, milestones: MilestoneCompletionResponse[]): MilestoneGroup {
+  return {
+    setId,
+    setTitle: setInfo?.title ?? 'Other',
+    setBonusXp: setInfo?.setBonusXp ?? 0,
+    completedCount: milestones.filter((m) => m.userCompleted === true).length,
+    totalCount: milestones.length,
+    milestones,
+  }
+}
 
-  const grouped = new Map<string, MilestoneCompletionResponse[]>()
+const milestonesBySetId = computed(() => {
+  const map = new Map<string, MilestoneCompletionResponse[]>()
   for (const m of activeMilestones.value) {
     const key = m.setId || 'uncategorized'
-    if (!grouped.has(key)) grouped.set(key, [])
-    grouped.get(key)!.push(m)
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(m)
+  }
+  return map
+})
+
+const setMap = computed(() => {
+  const map = new Map<string, MilestoneSetResponse>()
+  for (const s of props.sets) map.set(s.id, s)
+  return map
+})
+
+interface DisplayGroup {
+  groupId: string
+  groupName: string
+  groupDescription: string
+  sets: MilestoneGroup[]
+}
+
+function buildDisplayGroupFromSets(groupId: string, groupName: string, groupDescription: string, groupSets: MilestoneSetResponse[]): DisplayGroup {
+  return {
+    groupId,
+    groupName,
+    groupDescription,
+    sets: groupSets
+      .map((s) => buildMilestoneGroup(s.id, setMap.value.get(s.id), milestonesBySetId.value.get(s.id) ?? []))
+      .filter((g) => g.totalCount > 0),
+  }
+}
+
+const displayGroups = computed<DisplayGroup[]>(() => {
+  const hasGroups = (props.groups?.length ?? 0) > 0
+
+  if (!hasGroups) {
+    const allSets: MilestoneGroup[] = []
+    for (const [setId, items] of milestonesBySetId.value) {
+      allSets.push(buildMilestoneGroup(setId, setMap.value.get(setId), items))
+    }
+    if (allSets.length === 0) return []
+    return [{ groupId: 'all', groupName: '', groupDescription: '', sets: allSets }]
   }
 
-  const result: MilestoneGroup[] = []
-  for (const [setId, items] of grouped) {
-    const setInfo = setMap.get(setId)
-    result.push({
-      setId,
-      setTitle: setInfo?.title ?? 'Other',
-      setBonusXp: setInfo?.setBonusXp ?? 0,
-      completedCount: items.filter((m) => m.userCompleted === true).length,
-      totalCount: items.length,
-      milestones: items,
-    })
+  const result: DisplayGroup[] = props.groups!.map((rg) =>
+    buildDisplayGroupFromSets(rg.group.id, rg.group.name, rg.group.description, rg.sets),
+  ).filter((dg) => dg.sets.length > 0)
+
+  const standalone = props.standaloneSets ?? []
+  if (standalone.length > 0) {
+    const standaloneGroup = buildDisplayGroupFromSets('standalone', 'Other', '', standalone)
+    if (standaloneGroup.sets.length > 0) {
+      result.push(standaloneGroup)
+    }
   }
+
   return result
 })
+
+const allSets = computed<MilestoneGroup[]>(() =>
+  displayGroups.value.flatMap((dg) => dg.sets),
+)
 
 function toggleSet(setId: string) {
   if (expandedSets.value.has(setId)) {
@@ -107,22 +160,14 @@ function toggleSet(setId: string) {
   }
 }
 
-const hasAutoExpanded = ref(false)
 
-watchEffect(() => {
-  if (!hasAutoExpanded.value && !props.loading && groups.value.length > 0) {
-    expandedSets.value.add(groups.value[0].setId)
-    hasAutoExpanded.value = true
-  }
-})
 </script>
 
 <template>
   <div class="milestone-list-view">
     <div class="milestone-list-view__controls">
       <BaseTabs :tabs="viewTabs" :model-value="viewMode" @update:model-value="viewMode = $event" />
-      <BaseSelect :model-value="activeSort" :options="sortOptions"
-        @update:model-value="onSortChange" />
+      <BaseSelect :model-value="activeSort" :options="sortOptions" @update:model-value="onSortChange" />
     </div>
 
     <template v-if="loading">
@@ -138,7 +183,7 @@ watchEffect(() => {
       <p>Log in with your Steam ID to track your milestone progress</p>
     </div>
 
-    <p v-else-if="groups.length === 0" class="milestone-list-view__empty">
+    <p v-else-if="allSets.length === 0" class="milestone-list-view__empty">
       {{ viewMode === 'completed' ? 'No completed milestones yet' : 'No milestone progress found' }}
     </p>
 
@@ -150,31 +195,39 @@ watchEffect(() => {
     </template>
 
     <template v-else>
-      <div v-for="group in groups" :key="group.setId" class="milestone-set">
-        <button class="milestone-set__header" :aria-expanded="expandedSets.has(group.setId)" @click="toggleSet(group.setId)">
-          <div class="milestone-set__info">
-            <h3 class="milestone-set__title">{{ group.setTitle }}</h3>
-            <span v-if="loggedIn" class="milestone-set__count">
-              {{ group.completedCount }}/{{ group.totalCount }} completed
-            </span>
-            <span v-else class="milestone-set__count">
-              {{ group.totalCount }} milestones
-            </span>
-          </div>
-          <div class="milestone-set__meta">
-            <span v-if="group.setBonusXp > 0" class="milestone-set__bonus">
-              +{{ group.setBonusXp }} XP bonus
-            </span>
-            <span class="milestone-set__chevron"
-              :class="{ 'milestone-set__chevron--open': expandedSets.has(group.setId) }">
-              &#9660;
-            </span>
-          </div>
-        </button>
+      <div v-for="dg in displayGroups" :key="dg.groupId" class="milestone-group">
+        <div v-if="dg.groupName" class="milestone-group__header">
+          <h2 class="milestone-group__title">{{ dg.groupName }}</h2>
+          <p v-if="dg.groupDescription" class="milestone-group__desc">{{ dg.groupDescription }}</p>
+        </div>
 
-        <div v-if="expandedSets.has(group.setId)" class="milestone-set__rows">
-          <MilestoneDetail v-for="m in group.milestones" :key="m.milestoneId" :milestone="m" :logged-in="loggedIn"
-            compact />
+        <div v-for="ms in dg.sets" :key="ms.setId" class="milestone-set">
+          <button class="milestone-set__header" :aria-expanded="expandedSets.has(ms.setId)"
+            @click="toggleSet(ms.setId)">
+            <div class="milestone-set__info">
+              <h3 class="milestone-set__title">{{ ms.setTitle }}</h3>
+              <span v-if="loggedIn" class="milestone-set__count">
+                {{ ms.completedCount }}/{{ ms.totalCount }} completed
+              </span>
+              <span v-else class="milestone-set__count">
+                {{ ms.totalCount }} milestones
+              </span>
+            </div>
+            <div class="milestone-set__meta">
+              <span v-if="ms.setBonusXp > 0" class="milestone-set__bonus">
+                +{{ ms.setBonusXp }} XP bonus
+              </span>
+              <span class="milestone-set__chevron"
+                :class="{ 'milestone-set__chevron--open': expandedSets.has(ms.setId) }">
+                &#9660;
+              </span>
+            </div>
+          </button>
+
+          <div v-if="expandedSets.has(ms.setId)" class="milestone-set__rows">
+            <MilestoneDetail v-for="m in ms.milestones" :key="m.milestoneId" :milestone="m" :logged-in="loggedIn"
+              compact />
+          </div>
         </div>
       </div>
     </template>
@@ -216,6 +269,29 @@ watchEffect(() => {
   margin: 0;
   font-size: var(--text-body);
   max-width: 320px;
+}
+
+.milestone-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.milestone-group__header {
+  padding: var(--space-sm) 0;
+}
+
+.milestone-group__title {
+  font-size: var(--text-section-heading);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.milestone-group__desc {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  margin: var(--space-xs) 0 0;
 }
 
 .milestone-set {

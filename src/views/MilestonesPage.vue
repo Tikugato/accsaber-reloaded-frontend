@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { MilestoneSort } from '@/api/milestones'
 import ParticleCanvas from '@/components/common/ParticleCanvas.vue'
 import SkeletonLoader from '@/components/common/SkeletonLoader.vue'
 import MilestoneListView from '@/components/domain/MilestoneListView.vue'
@@ -6,9 +7,8 @@ import SetChartMap from '@/components/domain/SetChartMap.vue'
 import SetDetail from '@/components/domain/SetDetail.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
-import type { MilestoneSort } from '@/api/milestones'
-import type { MilestoneCompletionResponse, MilestoneSetResponse, PrerequisiteLinkResponse } from '@/types/api/milestones'
-import type { CrossSetEdge, EnrichedPrerequisite } from '@/types/milestones'
+import type { MilestoneCompletionResponse, MilestoneSetResponse, PrerequisiteLinkResponse, SetGroupLinkResponse, SetGroupResponse } from '@/types/api/milestones'
+import type { CrossSetEdge, EnrichedPrerequisite, ResolvedSetGroup } from '@/types/milestones'
 import { enrichPrerequisites, extractCrossSetEdges } from '@/utils/milestonePrereqs'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -21,9 +21,38 @@ const router = useRouter()
 const loading = ref(true)
 const sets = ref<MilestoneSetResponse[]>([])
 const milestones = ref<MilestoneCompletionResponse[]>([])
+const setGroups = ref<SetGroupResponse[]>([])
+const setGroupLinks = ref<Map<string, SetGroupLinkResponse[]>>(new Map())
 const milestoneSort = ref<MilestoneSort>('tier')
 const isMobile = ref(false)
 const viewMode = ref<'chart' | 'list'>('chart')
+
+const resolvedGroups = computed<ResolvedSetGroup[]>(() => {
+  const result: ResolvedSetGroup[] = []
+  for (const group of setGroups.value) {
+    const links = setGroupLinks.value.get(group.id) ?? []
+    const sortedLinks = [...links].sort((a, b) => a.sortOrder - b.sortOrder)
+    const groupSets = sortedLinks
+      .map((link) => sets.value.find((s) => s.id === link.setId))
+      .filter((s): s is MilestoneSetResponse => s !== undefined)
+    if (groupSets.length > 0) {
+      result.push({ group, sets: groupSets })
+    }
+  }
+  return result
+})
+
+const groupedSetIds = computed(() => {
+  const ids = new Set<string>()
+  for (const links of setGroupLinks.value.values()) {
+    for (const link of links) ids.add(link.setId)
+  }
+  return ids
+})
+
+const standaloneSets = computed(() =>
+  sets.value.filter((s) => !groupedSetIds.value.has(s.id)),
+)
 
 const selectedSetId = computed({
   get: (): string | null => (route.query.set as string) || null,
@@ -76,18 +105,32 @@ const lockedPlaceholders = computed(() => {
 async function fetchData() {
   loading.value = true
   try {
-    const { getMilestoneSets, getMilestoneCompletionStats } = await import('@/api/milestones')
-    const [setsRes, completionRes] = await Promise.all([
+    const { getMilestoneSets, getMilestoneCompletionStats, getSetGroups, getSetGroupLinks } = await import('@/api/milestones')
+    const [setsRes, completionRes, groupsRes] = await Promise.all([
       getMilestoneSets({ userId: authStore.userId ?? undefined, size: 100 }),
       getMilestoneCompletionStats(authStore.userId ?? undefined, milestoneSort.value),
+      getSetGroups(),
     ])
     sets.value = setsRes.content
     milestones.value = completionRes
+    setGroups.value = groupsRes
+
+    const linkResults = await Promise.allSettled(
+      groupsRes.map((g) => getSetGroupLinks(g.id)),
+    )
+    const linksMap = new Map<string, SetGroupLinkResponse[]>()
+    for (let i = 0; i < groupsRes.length; i++) {
+      const result = linkResults[i]
+      linksMap.set(groupsRes[i].id, result.status === 'fulfilled' ? result.value : [])
+    }
+    setGroupLinks.value = linksMap
 
     fetchAllPrerequisites(setsRes.content)
   } catch {
     sets.value = []
     milestones.value = []
+    setGroups.value = []
+    setGroupLinks.value = new Map()
   }
   loading.value = false
 }
@@ -192,8 +235,8 @@ watch(() => authStore.userId, fetchData)
     </div>
 
     <template v-else-if="viewMode === 'list' && !selectedSetId">
-      <MilestoneListView :milestones="milestones" :sets="sets" :sort="milestoneSort"
-        :logged-in="authStore.isLoggedIn" @update:sort="handleSortChange" />
+      <MilestoneListView :milestones="milestones" :sets="sets" :sort="milestoneSort" :logged-in="authStore.isLoggedIn"
+        :groups="resolvedGroups" :standalone-sets="standaloneSets" @update:sort="handleSortChange" />
     </template>
 
     <Transition v-else name="zoom" mode="out-in">
@@ -204,17 +247,39 @@ watch(() => authStore.userId, fetchData)
 
       <SetChartMap v-else-if="!isMobile" key="set-chart-map" :sets="sets" :milestones-by-set="milestonesBySet"
         :selected-set-id="selectedSetId" :locked-sets="lockedPlaceholders" :cross-set-edges="crossSetEdges"
-        @select-set="selectedSetId = $event" />
+        :groups="resolvedGroups" :standalone-sets="standaloneSets" @select-set="selectedSetId = $event" />
 
       <div v-else key="mobile-list" class="milestones-page__mobile-list">
-        <button v-for="set in sets" :key="set.id" class="milestones-page__mobile-card" @click="selectedSetId = set.id">
-          <div class="milestones-page__mobile-card-header">
-            <h3 class="milestones-page__mobile-card-title">{{ set.title }}</h3>
-            <span class="milestones-page__mobile-card-count">
-              {{ (milestonesBySet.get(set.id) ?? []).length }} milestones
-            </span>
+        <template v-for="rg in resolvedGroups" :key="rg.group.id">
+          <div class="milestones-page__mobile-group">
+            <h2 class="milestones-page__mobile-group-title">{{ rg.group.name }}</h2>
+            <p v-if="rg.group.description" class="milestones-page__mobile-group-desc">{{ rg.group.description }}</p>
           </div>
-        </button>
+          <button v-for="set in rg.sets" :key="set.id" class="milestones-page__mobile-card"
+            @click="selectedSetId = set.id">
+            <div class="milestones-page__mobile-card-header">
+              <h3 class="milestones-page__mobile-card-title">{{ set.title }}</h3>
+              <span class="milestones-page__mobile-card-count">
+                {{ (milestonesBySet.get(set.id) ?? []).length }} milestones
+              </span>
+            </div>
+          </button>
+        </template>
+
+        <template v-if="standaloneSets.length > 0">
+          <div v-if="resolvedGroups.length > 0" class="milestones-page__mobile-group">
+            <h2 class="milestones-page__mobile-group-title">Other</h2>
+          </div>
+          <button v-for="set in standaloneSets" :key="set.id" class="milestones-page__mobile-card"
+            @click="selectedSetId = set.id">
+            <div class="milestones-page__mobile-card-header">
+              <h3 class="milestones-page__mobile-card-title">{{ set.title }}</h3>
+              <span class="milestones-page__mobile-card-count">
+                {{ (milestonesBySet.get(set.id) ?? []).length }} milestones
+              </span>
+            </div>
+          </button>
+        </template>
 
         <div v-for="lg in lockedPlaceholders" :key="lg.id"
           class="milestones-page__mobile-card milestones-page__mobile-card--locked">
@@ -402,6 +467,23 @@ watch(() => authStore.userId, fetchData)
   height: 16px;
   color: var(--text-tertiary);
   flex-shrink: 0;
+}
+
+.milestones-page__mobile-group {
+  padding: var(--space-sm) 0 var(--space-xs);
+}
+
+.milestones-page__mobile-group-title {
+  font-size: var(--text-section-heading);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.milestones-page__mobile-group-desc {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  margin: var(--space-xs) 0 0;
 }
 
 .zoom-enter-active,

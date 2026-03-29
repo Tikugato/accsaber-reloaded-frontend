@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { Highway, SetNodeLayout } from '@/composables/useStarChart'
+import type { Highway, SetGroupCluster, SetNodeLayout } from '@/composables/useStarChart'
 import { scatterPosition, useStarChart } from '@/composables/useStarChart'
 import type { MilestoneCompletionResponse, MilestoneSetResponse } from '@/types/api/milestones'
-import type { CrossSetEdge } from '@/types/milestones'
+import type { CrossSetEdge, ResolvedSetGroup } from '@/types/milestones'
 import { hashString } from '@/utils/constants'
 import { computed, onMounted, onUnmounted, ref, toRef } from 'vue'
 import SetHighway from './SetHighway.vue'
@@ -14,6 +14,8 @@ const props = defineProps<{
   selectedSetId: string | null
   lockedSets?: { id: string; title: string; index: number }[]
   crossSetEdges?: CrossSetEdge[]
+  groups?: ResolvedSetGroup[]
+  standaloneSets?: MilestoneSetResponse[]
 }>()
 
 const emit = defineEmits<{
@@ -34,9 +36,43 @@ const { computeSetPositions, computeHighways } = useStarChart(
 
 const lockedCount = computed(() => props.lockedSets?.length ?? 0)
 
-const setNodes = computed<SetNodeLayout[]>(() =>
-  computeSetPositions(containerWidth.value, containerHeight.value, lockedCount.value),
+const groupClusters = computed<SetGroupCluster[]>(() =>
+  (props.groups ?? []).map((rg) => ({
+    groupId: rg.group.id,
+    groupName: rg.group.name,
+    setIds: rg.sets.map((s) => s.id),
+  })),
 )
+
+const setNodes = computed<SetNodeLayout[]>(() =>
+  computeSetPositions(containerWidth.value, containerHeight.value, lockedCount.value, groupClusters.value),
+)
+
+const groupLabels = computed(() => {
+  if (!props.groups || props.groups.length === 0) return []
+
+  const weights: number[] = props.groups.map((rg) => Math.max(rg.sets.length, 1))
+  const standaloneCount = props.standaloneSets?.length ?? 0
+  if (standaloneCount > 0) weights.push(Math.max(standaloneCount, 1))
+  if (lockedCount.value > 0) weights.push(Math.max(lockedCount.value, 1))
+  const totalWeight = weights.reduce((s, w) => s + w, 0)
+
+  const padX = containerWidth.value * 0.06
+  const usableW = containerWidth.value - padX * 2
+
+  let cursorX = padX
+  return props.groups.map((rg, i) => {
+    const segW = (weights[i] / totalWeight) * usableW
+    const label = {
+      id: rg.group.id,
+      name: rg.group.name,
+      x: cursorX + segW / 2,
+      y: containerHeight.value * 0.06,
+    }
+    cursorX += segW
+    return label
+  })
+})
 
 const totalNodeCount = computed(() => props.sets.length + lockedCount.value)
 
@@ -54,6 +90,12 @@ const lockedPositions = computed(() =>
 )
 
 const highways = computed<Highway[]>(() => computeHighways(setNodes.value, props.crossSetEdges))
+
+const dynamicMinHeight = computed(() => {
+  const totalSets = props.sets.length + (props.lockedSets?.length ?? 0)
+  const extraSets = Math.max(0, totalSets - 8)
+  return Math.min(200, 60 + extraSets * 8)
+})
 
 const hoveredMilestoneCount = computed(() => {
   if (!hoveredSet.value) return 0
@@ -102,10 +144,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="containerRef" class="set-chart-map" :class="{ 'set-chart-map--zoomed': selectedSetId !== null }">
+  <div ref="containerRef" class="set-chart-map" :class="{ 'set-chart-map--zoomed': selectedSetId !== null }"
+    :style="{ minHeight: `${dynamicMinHeight}vh` }">
     <svg class="set-chart-map__highways" :viewBox="`0 0 ${containerWidth} ${containerHeight}`" aria-hidden="true">
       <SetHighway v-for="(hw, i) in highways" :key="i" :from="hw.from" :to="hw.to" :opacity="hw.opacity" />
     </svg>
+
+    <div v-for="label in groupLabels" :key="`label-${label.id}`" class="set-chart-map__group-label"
+      :style="{ left: `${label.x}px`, top: `${label.y}px` }">
+      {{ label.name }}
+    </div>
 
     <SetNode v-for="node in setNodes" :key="node.id" :set="node.set" :position="node.position"
       :milestone-count="node.milestoneCount" :completion-percentage="node.completionPercentage"
@@ -150,6 +198,19 @@ onUnmounted(() => {
   height: 100%;
   pointer-events: none;
   z-index: 1;
+}
+
+.set-chart-map__group-label {
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 2;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .set-chart-map__node--hidden {
