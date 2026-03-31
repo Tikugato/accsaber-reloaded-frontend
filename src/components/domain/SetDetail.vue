@@ -327,6 +327,57 @@ const starPositions = computed<StarLayout[]>(() => {
     }
   }
 
+  const prereqEdges = allPrereqs
+    .filter((p) => positions.has(p.prerequisiteMilestoneId) && positions.has(p.milestoneId))
+    .map((p) => ({ from: p.prerequisiteMilestoneId, to: p.milestoneId }))
+
+  function countCrossings(): number {
+    let count = 0
+    for (let i = 0; i < prereqEdges.length; i++) {
+      const e1f = positions.get(prereqEdges[i].from)!
+      const e1t = positions.get(prereqEdges[i].to)!
+      for (let j = i + 1; j < prereqEdges.length; j++) {
+        const e2f = positions.get(prereqEdges[j].from)!
+        const e2t = positions.get(prereqEdges[j].to)!
+        const d1 = e1f.y - e2f.y
+        const d2 = e1t.y - e2t.y
+        if ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) count++
+      }
+    }
+    return count
+  }
+
+  const depthGroups = new Map<number, string[]>()
+  for (const m of sorted) {
+    const d = depths.get(m.milestoneId) ?? 0
+    if (!depthGroups.has(d)) depthGroups.set(d, [])
+    depthGroups.get(d)!.push(m.milestoneId)
+  }
+
+  for (let pass = 0; pass < 10; pass++) {
+    let improved = false
+    for (const [, group] of depthGroups) {
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          const before = countCrossings()
+          const posA = positions.get(group[i])!
+          const posB = positions.get(group[j])!
+          const tmpY = posA.y
+          posA.y = posB.y
+          posB.y = tmpY
+          const after = countCrossings()
+          if (after < before) {
+            improved = true
+          } else {
+            posB.y = posA.y
+            posA.y = tmpY
+          }
+        }
+      }
+    }
+    if (!improved) break
+  }
+
   const minDist = 8
   const ids = [...positions.keys()]
   for (let pass = 0; pass < 3; pass++) {

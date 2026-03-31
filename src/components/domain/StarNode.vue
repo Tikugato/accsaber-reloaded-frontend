@@ -24,6 +24,7 @@ const tierScale = computed(() => (props.ghost ? (TIER_SCALES[tierKey.value] ?? 1
 const isCompleted = computed(() => props.milestone.userCompleted === true)
 const isNotCompleted = computed(() => !!props.loggedIn && !isCompleted.value)
 const isMilestoneType = computed(() => props.milestone.type?.toUpperCase() === 'MILESTONE')
+const isApex = computed(() => tierKey.value === 'APEX')
 
 const ariaLabel = computed(() => {
   if (props.ghost) {
@@ -47,6 +48,7 @@ function handleClick() {
     'star-node--completed': isCompleted,
     'star-node--dim': isNotCompleted,
     'star-node--ghost': !!ghost,
+    'star-node--apex': isApex,
   }" :style="{
     left: `${position.x}%`,
     top: `${position.y}%`,
@@ -56,7 +58,11 @@ function handleClick() {
     @pointerleave="emit('leave')" @focus="emit('hover', milestone)" @blur="emit('leave')">
     <span class="star-node__glow" />
     <span class="star-node__core">
-      <svg v-if="isMilestoneType" class="star-node__icon" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+      <svg v-if="isApex" class="star-node__icon" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+        stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M10 2l3 5 5 1-4 4 1 5-5-3-5 3 1-5-4-4 5-1z" />
+      </svg>
+      <svg v-else-if="isMilestoneType" class="star-node__icon" viewBox="0 0 20 20" fill="none" stroke="currentColor"
         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <line x1="4" y1="3" x2="4" y2="17" />
         <path d="M4 3h10l-3 4 3 4H4" />
@@ -175,6 +181,40 @@ function handleClick() {
   color: var(--tier-color);
 }
 
+.star-node--apex .star-node__core {
+  background: var(--tier-color);
+  box-shadow:
+    0 0 12px var(--tier-color),
+    0 0 32px color-mix(in srgb, var(--tier-color) 40%, transparent);
+}
+
+.star-node--apex .star-node__glow {
+  opacity: 0.5;
+  animation: apex-pulse 3s ease-in-out infinite;
+}
+
+.star-node--apex .star-node__icon {
+  width: 12px;
+  height: 12px;
+}
+
+.star-node--apex.star-node--completed .star-node__core {
+  box-shadow:
+    0 0 16px var(--tier-color),
+    0 0 40px color-mix(in srgb, var(--tier-color) 50%, transparent),
+    0 0 64px color-mix(in srgb, var(--tier-color) 20%, transparent);
+}
+
+.star-node--apex.star-node--completed .star-node__core::before,
+.star-node--apex.star-node--completed .star-node__core::after {
+  opacity: 0.6;
+}
+
+@keyframes apex-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.15); }
+}
+
 .star-node__set-label {
   position: absolute;
   top: calc(100% + 4px);
@@ -194,6 +234,10 @@ function handleClick() {
   .star-node__glow,
   .star-node__core {
     transition: none;
+  }
+
+  .star-node--apex .star-node__glow {
+    animation: none;
   }
 }
 </style>

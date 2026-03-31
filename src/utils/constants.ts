@@ -48,6 +48,7 @@ export const TIER_COLORS: Record<string, string> = {
   GOLD: 'var(--tier-gold)',
   PLATINUM: 'var(--tier-platinum)',
   DIAMOND: 'var(--tier-diamond)',
+  APEX: 'var(--tier-apex)',
 }
 
 export const TIER_ORDER: Record<string, number> = {
@@ -56,6 +57,7 @@ export const TIER_ORDER: Record<string, number> = {
   GOLD: 2, gold: 2,
   PLATINUM: 3, platinum: 3,
   DIAMOND: 4, diamond: 4,
+  APEX: 5, apex: 5,
 }
 
 export const TIER_SCALES: Record<string, number> = {
@@ -64,6 +66,7 @@ export const TIER_SCALES: Record<string, number> = {
   GOLD: 1.0,
   PLATINUM: 1.15,
   DIAMOND: 1.3,
+  APEX: 1.8,
 }
 
 export function tierColor(tier: string): string {

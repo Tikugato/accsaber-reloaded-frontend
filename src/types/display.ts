@@ -136,7 +136,7 @@ export interface DifficultyScoreDisplay {
   rankWhenSet: number
 }
 
-export type MilestoneTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND'
+export type MilestoneTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'APEX'
 
 export interface MilestoneDisplay {
   id: string

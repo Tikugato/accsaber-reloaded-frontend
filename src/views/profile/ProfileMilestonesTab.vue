@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import MilestoneListView from '@/components/domain/MilestoneListView.vue'
 import type { MilestoneSort } from '@/api/milestones'
+import { useSetGroups } from '@/composables/useSetGroups'
 import type { MilestoneCompletionResponse, MilestoneSetResponse } from '@/types/api/milestones'
 import { ref, watch } from 'vue'
 
@@ -13,6 +14,8 @@ const milestones = ref<MilestoneCompletionResponse[]>([])
 const sets = ref<MilestoneSetResponse[]>([])
 const sort = ref<MilestoneSort>('tier')
 
+const { resolvedGroups, standaloneSets, fetchGroups, resetGroups } = useSetGroups(sets)
+
 async function fetchMilestones(sortBy?: MilestoneSort) {
   loading.value = true
   try {
@@ -23,9 +26,12 @@ async function fetchMilestones(sortBy?: MilestoneSort) {
     ])
     milestones.value = completionRes
     sets.value = setRes.content
+
+    await fetchGroups()
   } catch {
     milestones.value = []
     sets.value = []
+    resetGroups()
   }
   loading.value = false
 }
@@ -45,5 +51,5 @@ watch(() => props.userId, () => { fetchMilestones() }, { immediate: true })
 
 <template>
   <MilestoneListView :milestones="milestones" :sets="sets" :sort="sort" :loading="loading" logged-in
-    @update:sort="handleSortChange" />
+    :groups="resolvedGroups" :standalone-sets="standaloneSets" @update:sort="handleSortChange" />
 </template>

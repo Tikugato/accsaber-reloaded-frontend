@@ -89,7 +89,7 @@ const lockedPositions = computed(() =>
   })),
 )
 
-const highways = computed<Highway[]>(() => computeHighways(setNodes.value, props.crossSetEdges))
+const highways = computed<Highway[]>(() => computeHighways(setNodes.value, props.crossSetEdges, groupClusters.value))
 
 const dynamicMinHeight = computed(() => {
   const totalSets = props.sets.length + (props.lockedSets?.length ?? 0)

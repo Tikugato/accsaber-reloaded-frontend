@@ -12,6 +12,7 @@ const props = defineProps<{
 const categoryStore = useCategoryStore()
 
 const tierColor = computed(() => getTierColor(props.milestone.tier))
+const isApex = computed(() => props.milestone.tier?.toUpperCase() === 'APEX')
 
 const accentColor = computed(() =>
   props.milestone.categoryCode ? categoryStore.getAccent(props.milestone.categoryCode) : undefined,
@@ -33,13 +34,18 @@ const progressBarWidth = computed(() => Math.min(100, progressPercent.value ?? 0
   <div class="milestone-card" :class="{
     'milestone-card--completed': milestone.isCompleted,
     'milestone-card--dim': loggedIn && !milestone.isCompleted,
+    'milestone-card--apex': isApex,
   }" :style="accentColor ? { '--ms-accent': accentColor, '--tier-color': tierColor } : { '--tier-color': tierColor }">
     <div class="milestone-card__header">
       <span class="milestone-card__icon" :class="{
         'milestone-card__icon--completed': milestone.isCompleted,
         'milestone-card__icon--gray': loggedIn && !milestone.isCompleted,
       }">
-        <svg v-if="milestone.type?.toUpperCase() === 'MILESTONE'" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+        <svg v-if="isApex" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 2l3 5 5 1-4 4 1 5-5-3-5 3 1-5-4-4 5-1z" />
+        </svg>
+        <svg v-else-if="milestone.type?.toUpperCase() === 'MILESTONE'" viewBox="0 0 20 20" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="4" y1="3" x2="4" y2="17" />
           <path d="M4 3h10l-3 4 3 4H4" />
@@ -112,6 +118,29 @@ const progressBarWidth = computed(() => Math.min(100, progressPercent.value ?? 0
 
 .milestone-card--dim {
   opacity: 0.5;
+}
+
+.milestone-card--apex {
+  border-color: color-mix(in srgb, var(--tier-color) 30%, var(--bg-overlay));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--tier-color) 5%, var(--bg-surface)) 0%,
+    var(--bg-surface) 100%
+  );
+}
+
+.milestone-card--apex .milestone-card__icon {
+  width: 44px;
+  height: 44px;
+}
+
+.milestone-card--apex .milestone-card__icon--completed {
+  filter: drop-shadow(0 0 6px var(--tier-color)) drop-shadow(0 0 12px color-mix(in srgb, var(--tier-color) 40%, transparent));
+}
+
+.milestone-card--apex .milestone-card__title {
+  font-size: var(--text-section-heading);
+  color: var(--tier-color);
 }
 
 .milestone-card__icon svg {

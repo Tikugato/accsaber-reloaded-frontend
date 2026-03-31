@@ -83,13 +83,14 @@ export function useStarChart(
   }
 
   function separateOverlaps(nodes: SetNodeLayout[], containerWidth: number, containerHeight: number, regionX?: number, regionW?: number) {
-    const minDist = 70
+    const minDist = 110
     const padX = regionX ?? containerWidth * 0.1
     const maxX = regionX !== undefined && regionW !== undefined ? regionX + regionW : containerWidth - containerWidth * 0.1
     const padY = containerHeight * 0.15
     const maxY = containerHeight - padY
 
-    for (let pass = 0; pass < 3; pass++) {
+    for (let pass = 0; pass < 12; pass++) {
+      let anyOverlap = false
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const a = nodes[i].position
@@ -99,7 +100,8 @@ export function useStarChart(
           const dist = Math.sqrt(dx * dx + dy * dy)
           if (dist >= minDist || dist === 0) continue
 
-          const overlap = (minDist - dist) / 2
+          anyOverlap = true
+          const overlap = (minDist - dist) / 2 + 1
           const nx = dx / dist
           const ny = dy / dist
           a.x = Math.max(padX, Math.min(maxX, a.x - nx * overlap))
@@ -108,6 +110,7 @@ export function useStarChart(
           b.y = Math.max(padY, Math.min(maxY, b.y + ny * overlap))
         }
       }
+      if (!anyOverlap) break
     }
   }
 
@@ -176,11 +179,18 @@ export function useStarChart(
     return nodes
   }
 
-  function computeHighways(nodes: SetNodeLayout[], crossSetEdges?: CrossSetEdge[]): Highway[] {
+  function computeHighways(nodes: SetNodeLayout[], crossSetEdges?: CrossSetEdge[], groups?: SetGroupCluster[]): Highway[] {
     if (nodes.length < 2) return []
 
     const nodeMap = new Map<string, SetNodeLayout>()
     for (const n of nodes) nodeMap.set(n.id, n)
+
+    const nodeGroupMap = new Map<string, string>()
+    if (groups) {
+      for (const g of groups) {
+        for (const id of g.setIds) nodeGroupMap.set(id, g.groupId)
+      }
+    }
 
     const highways: Highway[] = []
     const connected = new Set<string>()
@@ -204,8 +214,13 @@ export function useStarChart(
     }
 
     for (const node of nodes) {
+      const nodeGroup = nodeGroupMap.get(node.id)
       const distances = nodes
-        .filter((n) => n.id !== node.id)
+        .filter((n) => {
+          if (n.id === node.id) return false
+          if (nodeGroupMap.size === 0) return true
+          return nodeGroupMap.get(n.id) === nodeGroup
+        })
         .map((n) => ({
           neighbor: n,
           dist: Math.sqrt(

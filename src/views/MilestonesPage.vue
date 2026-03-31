@@ -5,10 +5,11 @@ import SkeletonLoader from '@/components/common/SkeletonLoader.vue'
 import MilestoneListView from '@/components/domain/MilestoneListView.vue'
 import SetChartMap from '@/components/domain/SetChartMap.vue'
 import SetDetail from '@/components/domain/SetDetail.vue'
+import { useSetGroups } from '@/composables/useSetGroups'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
-import type { MilestoneCompletionResponse, MilestoneSetResponse, PrerequisiteLinkResponse, SetGroupLinkResponse, SetGroupResponse } from '@/types/api/milestones'
-import type { CrossSetEdge, EnrichedPrerequisite, ResolvedSetGroup } from '@/types/milestones'
+import type { MilestoneCompletionResponse, MilestoneSetResponse, PrerequisiteLinkResponse } from '@/types/api/milestones'
+import type { CrossSetEdge, EnrichedPrerequisite } from '@/types/milestones'
 import { enrichPrerequisites, extractCrossSetEdges } from '@/utils/milestonePrereqs'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -21,38 +22,11 @@ const router = useRouter()
 const loading = ref(true)
 const sets = ref<MilestoneSetResponse[]>([])
 const milestones = ref<MilestoneCompletionResponse[]>([])
-const setGroups = ref<SetGroupResponse[]>([])
-const setGroupLinks = ref<Map<string, SetGroupLinkResponse[]>>(new Map())
 const milestoneSort = ref<MilestoneSort>('tier')
 const isMobile = ref(false)
 const viewMode = ref<'chart' | 'list'>('chart')
 
-const resolvedGroups = computed<ResolvedSetGroup[]>(() => {
-  const result: ResolvedSetGroup[] = []
-  for (const group of setGroups.value) {
-    const links = setGroupLinks.value.get(group.id) ?? []
-    const sortedLinks = [...links].sort((a, b) => a.sortOrder - b.sortOrder)
-    const groupSets = sortedLinks
-      .map((link) => sets.value.find((s) => s.id === link.setId))
-      .filter((s): s is MilestoneSetResponse => s !== undefined)
-    if (groupSets.length > 0) {
-      result.push({ group, sets: groupSets })
-    }
-  }
-  return result
-})
-
-const groupedSetIds = computed(() => {
-  const ids = new Set<string>()
-  for (const links of setGroupLinks.value.values()) {
-    for (const link of links) ids.add(link.setId)
-  }
-  return ids
-})
-
-const standaloneSets = computed(() =>
-  sets.value.filter((s) => !groupedSetIds.value.has(s.id)),
-)
+const { resolvedGroups, standaloneSets, fetchGroups, resetGroups } = useSetGroups(sets)
 
 const selectedSetId = computed({
   get: (): string | null => (route.query.set as string) || null,
@@ -105,32 +79,20 @@ const lockedPlaceholders = computed(() => {
 async function fetchData() {
   loading.value = true
   try {
-    const { getMilestoneSets, getMilestoneCompletionStats, getSetGroups, getSetGroupLinks } = await import('@/api/milestones')
-    const [setsRes, completionRes, groupsRes] = await Promise.all([
+    const { getMilestoneSets, getMilestoneCompletionStats } = await import('@/api/milestones')
+    const [setsRes, completionRes] = await Promise.all([
       getMilestoneSets({ userId: authStore.userId ?? undefined, size: 100 }),
       getMilestoneCompletionStats(authStore.userId ?? undefined, milestoneSort.value),
-      getSetGroups(),
     ])
     sets.value = setsRes.content
     milestones.value = completionRes
-    setGroups.value = groupsRes
 
-    const linkResults = await Promise.allSettled(
-      groupsRes.map((g) => getSetGroupLinks(g.id)),
-    )
-    const linksMap = new Map<string, SetGroupLinkResponse[]>()
-    for (let i = 0; i < groupsRes.length; i++) {
-      const result = linkResults[i]
-      linksMap.set(groupsRes[i].id, result.status === 'fulfilled' ? result.value : [])
-    }
-    setGroupLinks.value = linksMap
-
+    await fetchGroups()
     fetchAllPrerequisites(setsRes.content)
   } catch {
     sets.value = []
     milestones.value = []
-    setGroups.value = []
-    setGroupLinks.value = new Map()
+    resetGroups()
   }
   loading.value = false
 }

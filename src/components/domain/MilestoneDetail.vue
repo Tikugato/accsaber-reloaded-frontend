@@ -15,6 +15,7 @@ const tierColor = computed(() => getTierColor(props.milestone.tier))
 const isCompleted = computed(() => props.milestone.userCompleted === true)
 const isNotCompleted = computed(() => !!props.loggedIn && !isCompleted.value)
 const isMilestoneType = computed(() => props.milestone.type?.toUpperCase() === 'MILESTONE')
+const isApex = computed(() => props.milestone.tier?.toUpperCase() === 'APEX')
 const hasScoreInfo = computed(() => isCompleted.value && !!props.milestone.achievedWithScoreId && !!accuracy.value)
 const typeLabel = computed(() => isMilestoneType.value ? 'milestone' : 'achievement')
 const blTooltip = computed(() => `This ${typeLabel.value} is exclusive to players with the BeatLeader mod.`)
@@ -63,6 +64,7 @@ function toggleExpand() {
     'milestone-detail--expandable': compact && hasScoreInfo,
     'milestone-detail--expanded': expanded,
     'milestone-detail--dim': isNotCompleted,
+    'milestone-detail--apex': isApex,
   }" :style="{ '--tier-color': tierColor }">
     <div class="milestone-detail__header" :tabindex="compact && hasScoreInfo ? 0 : undefined"
       :role="compact && hasScoreInfo ? 'button' : undefined"
@@ -72,7 +74,11 @@ function toggleExpand() {
         'milestone-detail__icon--completed': isCompleted,
         'milestone-detail__icon--gray': isNotCompleted,
       }">
-        <svg v-if="isMilestoneType" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"
+        <svg v-if="isApex" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 2l3 5 5 1-4 4 1 5-5-3-5 3 1-5-4-4 5-1z" />
+        </svg>
+        <svg v-else-if="isMilestoneType" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="4" y1="3" x2="4" y2="17" />
           <path d="M4 3h10l-3 4 3 4H4" />
@@ -221,6 +227,33 @@ function toggleExpand() {
 
 .milestone-detail--dim {
   opacity: 0.5;
+}
+
+.milestone-detail--apex {
+  border-color: color-mix(in srgb, var(--tier-color) 30%, var(--bg-overlay));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--tier-color) 5%, var(--bg-surface)) 0%,
+    var(--bg-surface) 100%
+  );
+}
+
+.milestone-detail--apex .milestone-detail__icon {
+  width: 36px;
+  height: 36px;
+}
+
+.milestone-detail--apex.milestone-detail--compact .milestone-detail__icon {
+  width: 24px;
+  height: 24px;
+}
+
+.milestone-detail--apex .milestone-detail__icon--completed {
+  filter: drop-shadow(0 0 6px var(--tier-color)) drop-shadow(0 0 12px color-mix(in srgb, var(--tier-color) 40%, transparent));
+}
+
+.milestone-detail--apex .milestone-detail__title {
+  color: var(--tier-color);
 }
 
 .milestone-detail__icon svg {
