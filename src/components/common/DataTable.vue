@@ -44,7 +44,7 @@ function handleRowClick(row: Record<string, unknown>, index: number, event: Mous
   if (props.rowTo) {
     const route = props.rowTo(row)
     if (!route) return
-    if (event.ctrlKey || event.metaKey || event.button === 1) return
+    if (event.ctrlKey || event.metaKey) return
     event.preventDefault()
     router.push(route)
   } else if (props.rowClickable) {
@@ -100,12 +100,17 @@ function sortIcon(col: TableColumn): string {
             <tr v-for="(row, index) in rows" :key="resolveRowKey(row, index)" class="data-table__row"
               :class="[{ 'data-table__row--clickable': rowClickable || !!rowTo }, rowClass?.(row, index)]"
               @click="handleRowClick(row, index, $event)">
-              <td v-for="(col, colIdx) in columns" :key="col.key" class="data-table__td" :class="{
+              <td v-for="col in columns" :key="col.key" class="data-table__td" :class="{
                 'data-table__td--mono': col.mono,
                 [`data-table__td--${col.align ?? 'left'}`]: true,
+                'data-table__td--linked': !!resolveRowHref(row),
               }">
-                <a v-if="colIdx === 0 && resolveRowHref(row)" :href="resolveRowHref(row)" class="data-table__row-link" tabindex="-1" aria-hidden="true" />
-                <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]" :index="index">
+                <a v-if="resolveRowHref(row)" :href="resolveRowHref(row)" class="data-table__cell-link" tabindex="-1">
+                  <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]" :index="index">
+                    {{ row[col.key] }}
+                  </slot>
+                </a>
+                <slot v-else :name="`cell-${col.key}`" :row="row" :value="row[col.key]" :index="index">
                   {{ row[col.key] }}
                 </slot>
               </td>
@@ -199,8 +204,6 @@ function sortIcon(col: TableColumn): string {
 }
 
 .data-table__row {
-  position: relative;
-  z-index: 0;
   height: 48px;
   border-left: 2px solid transparent;
   transition: border-color 120ms ease, background-color 120ms ease;
@@ -223,25 +226,22 @@ function sortIcon(col: TableColumn): string {
   background: color-mix(in srgb, var(--bg-elevated) 80%, var(--accent) 5%);
 }
 
-.data-table__row-link {
-  position: static;
-  display: inline;
-  text-decoration: none;
-  color: inherit;
-}
-
-.data-table__row-link::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
 .data-table__td {
   padding: var(--space-sm) var(--space-md);
   font-size: var(--text-body);
   color: var(--text-primary);
   vertical-align: middle;
+}
+
+.data-table__td--linked {
+  padding: 0;
+}
+
+.data-table__cell-link {
+  display: block;
+  padding: var(--space-sm) var(--space-md);
+  color: inherit;
+  text-decoration: none;
 }
 
 .data-table__td--left {
