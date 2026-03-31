@@ -200,6 +200,7 @@ function sortIcon(col: TableColumn): string {
 
 .data-table__row {
   position: relative;
+  z-index: 0;
   height: 48px;
   border-left: 2px solid transparent;
   transition: border-color 120ms ease, background-color 120ms ease;
