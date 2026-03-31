@@ -416,6 +416,8 @@ function toggleExpand() {
   flex-direction: row;
   align-items: baseline;
   gap: var(--space-sm);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .milestone-detail--compact .milestone-detail__title {
@@ -423,12 +425,19 @@ function toggleExpand() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .milestone-detail__inline-desc {
   font-weight: 400;
   color: var(--text-tertiary);
   font-size: var(--text-caption);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .milestone-detail__compact-meta {
