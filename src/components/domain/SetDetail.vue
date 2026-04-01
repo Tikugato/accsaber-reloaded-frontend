@@ -601,7 +601,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
     </div>
 
     <MilestoneListView :milestones="milestones" :sets="[set]" :sort="sort" :logged-in="loggedIn"
-      @update:sort="emit('update:sort', $event)" />
+      default-expanded @update:sort="emit('update:sort', $event)" />
   </div>
 </template>
 

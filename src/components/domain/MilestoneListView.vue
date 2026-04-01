@@ -17,6 +17,7 @@ const props = defineProps<{
   loggedIn?: boolean
   groups?: ResolvedSetGroup[]
   standaloneSets?: MilestoneSetResponse[]
+  defaultExpanded?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -158,6 +159,12 @@ function toggleSet(setId: string) {
   } else {
     expandedSets.value.add(setId)
   }
+}
+
+if (props.defaultExpanded) {
+  watch(allSets, (sets) => {
+    for (const s of sets) expandedSets.value.add(s.setId)
+  }, { immediate: true })
 }
 
 
