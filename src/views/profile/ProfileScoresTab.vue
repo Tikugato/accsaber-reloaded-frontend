@@ -129,6 +129,7 @@ function handleRowClick(row: Record<string, unknown>) {
 }
 
 function openDetail(diffId: string, event: Event) {
+  event.preventDefault()
   event.stopPropagation()
   detailScore.value = scores.value.find((s) => s.mapDifficultyId === diffId) ?? null
   detailOpen.value = true

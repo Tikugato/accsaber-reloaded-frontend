@@ -119,6 +119,7 @@ function handleRowClick(row: Record<string, unknown>) {
 }
 
 function openDetail(userId: string, event: Event) {
+  event.preventDefault()
   event.stopPropagation()
   const s = scores.value.find((sc) => sc.userId === userId)
   if (!s) return
