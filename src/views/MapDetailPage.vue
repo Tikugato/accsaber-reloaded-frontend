@@ -108,7 +108,7 @@ const metaDescription = computed(() => {
 const metaImage = computed(() => map.value?.coverUrl)
 
 const metaUrl = computed(() => {
-  const base = `${import.meta.env.VITE_SITE_URL}/maps/${mapId.value}`
+  const base = `${window.location.origin}/maps/${mapId.value}`
   return activeDifficultyId.value ? `${base}?difficultyId=${activeDifficultyId.value}` : base
 })
 

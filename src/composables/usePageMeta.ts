@@ -14,7 +14,7 @@ function toRef(val: Ref<string | undefined> | string | undefined): Ref<string | 
   return val
 }
 
-const SITE_URL = import.meta.env.VITE_SITE_URL
+const SITE_URL = window.location.origin
 
 const DEFAULT_TITLE = 'AccSaber Reloaded'
 const DEFAULT_DESCRIPTION = 'Accuracy-based leaderboard platform for Beat Saber.'

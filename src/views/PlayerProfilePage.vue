@@ -95,7 +95,7 @@ const metaDescription = computed(() => {
 
 const metaImage = computed(() => user.value?.avatarUrl)
 
-const metaUrl = computed(() => `${import.meta.env.VITE_SITE_URL}/players/${userId.value}`)
+const metaUrl = computed(() => `${window.location.origin}/players/${userId.value}`)
 
 usePageMeta({
   title: metaTitle,
