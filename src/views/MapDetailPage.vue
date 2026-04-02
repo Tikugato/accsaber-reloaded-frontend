@@ -97,12 +97,12 @@ const metaDescription = computed(() => {
   const diff = activeDifficulty.value
   const parts = [`Mapped by ${map.value.mapAuthor}`]
   if (diff) {
-    parts.push(`${categoryName.value}`, `Complexity ${diff.complexity.toFixed(2)}`)
+    parts.push(categoryName.value, `Complexity ${diff.complexity.toFixed(2)}`)
   }
   if (diffStats.value) {
     parts.push(`${diffStats.value.totalScores} scores`)
   }
-  return parts.join(' · ')
+  return parts.join('\n')
 })
 
 const metaImage = computed(() => map.value?.coverUrl)

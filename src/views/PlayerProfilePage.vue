@@ -90,7 +90,7 @@ const metaTitle = computed(() => {
 const metaDescription = computed(() => {
   if (!user.value || !activeStats.value) return undefined
   const s = activeStats.value
-  return `${s.ap.toFixed(2)} AP · ${s.averageAcc.toFixed(2)}% Avg Accuracy · ${s.rankedPlays} Ranked Plays`
+  return `${s.ap.toFixed(2)} AP\n#${s.ranking} Global\n${s.averageAcc.toFixed(2)}% Avg Accuracy\n${s.rankedPlays} Ranked Plays`
 })
 
 const metaImage = computed(() => user.value?.avatarUrl)
