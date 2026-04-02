@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import StatBlock from '@/components/common/StatBlock.vue'
+import SkillPrism from '@/components/domain/SkillPrism.vue'
 import TimeSeriesChart from '@/components/domain/TimeSeriesChart.vue'
 import { useCategoryStore } from '@/stores/categories'
 import type { UserAllStatisticsResponse, UserCategoryStatisticsResponse } from '@/types/api/users'
@@ -176,6 +177,21 @@ watch(
 
 <template>
   <div class="statistics-tab">
+    <div class="statistics-tab__top-row">
+      <section class="statistics-tab__chart">
+        <h3 class="statistics-tab__section-title">History</h3>
+        <TimeSeriesChart :data="chartPoints" :metric-label="selectedMetric" :accent-color="chartAccent"
+          :available-metrics="availableMetrics" :selected-metric="selectedMetric" :selected-range="selectedRange"
+          :invert-y="selectedMetric === 'rank'" :format-value="chartFormatValue"
+          @update:selected-metric="selectedMetric = $event" @update:selected-range="selectedRange = $event" />
+      </section>
+
+      <section v-if="xpStats?.categories?.length" class="statistics-tab__prism">
+        <h3 class="statistics-tab__section-title">Skill Prism</h3>
+        <SkillPrism :category-stats="xpStats.categories" />
+      </section>
+    </div>
+
     <section v-if="peakStats" class="statistics-tab__peaks">
       <h3 class="statistics-tab__section-title">Peak Stats</h3>
       <div class="statistics-tab__peaks-grid">
@@ -213,14 +229,6 @@ watch(
         <StatBlock label="Set Bonus XP" :value="xpStats.totalMilestoneSetBonusXp" :decimals="0" />
       </div>
     </section>
-
-    <section class="statistics-tab__chart">
-      <h3 class="statistics-tab__section-title">History</h3>
-      <TimeSeriesChart :data="chartPoints" :metric-label="selectedMetric" :accent-color="chartAccent"
-        :available-metrics="availableMetrics" :selected-metric="selectedMetric" :selected-range="selectedRange"
-        :invert-y="selectedMetric === 'rank'" :format-value="chartFormatValue"
-        @update:selected-metric="selectedMetric = $event" @update:selected-range="selectedRange = $event" />
-    </section>
   </div>
 </template>
 
@@ -253,6 +261,21 @@ watch(
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--space-sm);
+}
+
+.statistics-tab__top-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: var(--space-lg);
+  width: 100%;
+  align-self: stretch;
+}
+
+.statistics-tab__prism {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .xp-breakdown {
@@ -337,7 +360,16 @@ watch(
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
-  width: 100%;
-  max-width: 800px;
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .statistics-tab__top-row {
+    grid-template-columns: 1fr;
+  }
+
+  .statistics-tab__prism {
+    justify-self: center;
+  }
 }
 </style>
