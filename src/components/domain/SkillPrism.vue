@@ -16,42 +16,29 @@ const RADIUS = 90
 const SIZE = (RADIUS + PADDING) * 2
 const CENTER = SIZE / 2
 const RINGS = 4
+const ANGLE_OFFSET = -Math.PI / 2
 
-interface PrismAxis {
-  label: string
-  code: string
-  accent: string
-  value: number
-  normalized: number
-  x: number
-  y: number
-  labelX: number
-  labelY: number
-}
+const prismId = `prism-${Math.random().toString(36).slice(2, 8)}`
 
-const axes = computed<PrismAxis[]>(() => {
-  const validCategories = props.categoryStats
+const axes = computed(() => {
+  const valid = props.categoryStats
     .map((stat) => {
       const code = categoryStore.getCategoryCode(stat.categoryId)
       if (!code || code === 'xp' || code === 'overall') return null
       const info = categoryStore.getCategoryInfo(code)
       if (!info) return null
-      return { stat, code, info }
+      return { stat, info }
     })
     .filter((c): c is NonNullable<typeof c> => c !== null)
 
-  const count = validCategories.length
+  const count = valid.length
   if (count === 0) return []
 
-  const angleOffset = -Math.PI / 2
-
-  return validCategories.map((cat, i) => {
-    const angle = angleOffset + (2 * Math.PI * i) / count
+  return valid.map((cat, i) => {
+    const angle = ANGLE_OFFSET + (2 * Math.PI * i) / count
     const normalized = Math.min(cat.stat.ap / MAX_AP.value, 1)
-
     return {
       label: cat.info.name,
-      code: cat.code,
       accent: cat.info.accent,
       value: cat.stat.ap,
       normalized,
@@ -63,44 +50,31 @@ const axes = computed<PrismAxis[]>(() => {
   })
 })
 
-const gridRings = computed(() => {
-  return Array.from({ length: RINGS }, (_, i) => {
-    const fraction = (i + 1) / RINGS
-    return polygonPoints(fraction)
-  })
-})
-
-const gridLines = computed(() => {
-  if (axes.value.length === 0) return []
-  const count = axes.value.length
-  const angleOffset = -Math.PI / 2
-  return Array.from({ length: count }, (_, i) => {
-    const angle = angleOffset + (2 * Math.PI * i) / count
-    return {
-      x: CENTER + RADIUS * Math.cos(angle),
-      y: CENTER + RADIUS * Math.sin(angle),
-    }
-  })
-})
-
-const dataPolygon = computed(() => {
-  if (axes.value.length === 0) return ''
-  return axes.value.map((a) => `${a.x},${a.y}`).join(' ')
-})
-
-function polygonPoints(fraction: number): string {
+function polyAt(fraction: number): string {
   const count = axes.value.length
   if (count === 0) return ''
-  const angleOffset = -Math.PI / 2
   return Array.from({ length: count }, (_, i) => {
-    const angle = angleOffset + (2 * Math.PI * i) / count
-    const x = CENTER + RADIUS * fraction * Math.cos(angle)
-    const y = CENTER + RADIUS * fraction * Math.sin(angle)
-    return `${x},${y}`
+    const angle = ANGLE_OFFSET + (2 * Math.PI * i) / count
+    return `${CENTER + RADIUS * fraction * Math.cos(angle)},${CENTER + RADIUS * fraction * Math.sin(angle)}`
   }).join(' ')
 }
 
-const prismId = `prism-${Math.random().toString(36).slice(2, 8)}`
+const gridRings = computed(() =>
+  Array.from({ length: RINGS }, (_, i) => polyAt((i + 1) / RINGS)),
+)
+
+const spokes = computed(() => {
+  const count = axes.value.length
+  if (count === 0) return []
+  return Array.from({ length: count }, (_, i) => {
+    const angle = ANGLE_OFFSET + (2 * Math.PI * i) / count
+    return { x: CENTER + RADIUS * Math.cos(angle), y: CENTER + RADIUS * Math.sin(angle) }
+  })
+})
+
+const dataPolygon = computed(() =>
+  axes.value.map((a) => `${a.x},${a.y}`).join(' '),
+)
 
 const gradients = computed(() =>
   axes.value.map((axis, i) => ({
@@ -113,8 +87,13 @@ const gradients = computed(() =>
 )
 
 function formatAp(value: number): string {
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`
-  return value.toFixed(0)
+  return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toFixed(0)
+}
+
+function textAnchor(labelX: number): string {
+  if (labelX < CENTER - 2) return 'end'
+  if (labelX > CENTER + 2) return 'start'
+  return 'middle'
 }
 </script>
 
@@ -130,77 +109,49 @@ function formatAp(value: number): string {
           :key="grad.id"
           :id="grad.id"
           gradientUnits="userSpaceOnUse"
-          :cx="grad.cx"
-          :cy="grad.cy"
-          :r="grad.r"
+          :cx="grad.cx" :cy="grad.cy" :r="grad.r"
         >
           <stop offset="0%" :stop-color="grad.color" stop-opacity="0.45" />
           <stop offset="100%" :stop-color="grad.color" stop-opacity="0" />
         </radialGradient>
       </defs>
 
-      <polygon
-        v-for="(ring, i) in gridRings"
-        :key="'ring-' + i"
-        :points="ring"
-        class="skill-prism__ring"
-      />
+      <polygon v-for="(ring, i) in gridRings" :key="i" :points="ring" class="skill-prism__ring" />
 
       <line
-        v-for="(pt, i) in gridLines"
-        :key="'line-' + i"
-        :x1="CENTER"
-        :y1="CENTER"
-        :x2="pt.x"
-        :y2="pt.y"
+        v-for="(pt, i) in spokes" :key="'s' + i"
+        :x1="CENTER" :y1="CENTER" :x2="pt.x" :y2="pt.y"
         class="skill-prism__spoke"
       />
 
       <g :clip-path="`url(#${prismId}-clip)`">
         <rect
-          v-for="grad in gradients"
-          :key="grad.id + '-fill'"
-          x="0" y="0"
-          :width="SIZE" :height="SIZE"
+          v-for="grad in gradients" :key="grad.id"
+          x="0" y="0" :width="SIZE" :height="SIZE"
           :fill="`url(#${grad.id})`"
         />
       </g>
 
-      <polygon
-        :points="dataPolygon"
-        class="skill-prism__data-stroke"
-      />
+      <polygon :points="dataPolygon" class="skill-prism__data-stroke" />
 
       <circle
-        v-for="(axis, i) in axes"
-        :key="'dot-' + i"
-        :cx="axis.x"
-        :cy="axis.y"
-        r="3"
-        :fill="axis.accent"
+        v-for="(axis, i) in axes" :key="'d' + i"
+        :cx="axis.x" :cy="axis.y" r="3" :fill="axis.accent"
         class="skill-prism__dot"
       />
 
-      <g v-for="(axis, i) in axes" :key="'label-' + i">
+      <g v-for="(axis, i) in axes" :key="'l' + i">
         <text
-          :x="axis.labelX"
-          :y="axis.labelY - 6"
-          class="skill-prism__label"
-          :text-anchor="axis.labelX < CENTER - 2 ? 'end' : axis.labelX > CENTER + 2 ? 'start' : 'middle'"
-          dominant-baseline="auto"
-        >
-          {{ axis.label }}
-        </text>
+          :x="axis.labelX" :y="axis.labelY - 6"
+          :text-anchor="textAnchor(axis.labelX)"
+          dominant-baseline="auto" class="skill-prism__label"
+        >{{ axis.label }}</text>
         <text
-          :x="axis.labelX"
-          :y="axis.labelY + 8"
-          class="skill-prism__value"
+          :x="axis.labelX" :y="axis.labelY + 8"
+          :text-anchor="textAnchor(axis.labelX)"
           :fill="axis.accent"
-          :text-anchor="axis.labelX < CENTER - 2 ? 'end' : axis.labelX > CENTER + 2 ? 'start' : 'middle'"
-          dominant-baseline="auto"
-        >
-          {{ formatAp(axis.value) }} AP
-        </text>
+          dominant-baseline="auto" class="skill-prism__value"
+        >{{ formatAp(axis.value) }} AP</text>
       </g>
     </svg>
   </div>

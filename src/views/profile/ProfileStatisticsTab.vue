@@ -17,7 +17,6 @@ const categoryStore = useCategoryStore()
 const selectedMetric = ref<MetricType>('ap')
 const selectedRange = ref<TimeRange>('14d')
 const chartData = ref<UserCategoryStatisticsResponse[]>([])
-const chartLoading = ref(false)
 const allTimeData = ref<UserCategoryStatisticsResponse[]>([])
 
 const timeRangeParams: Record<TimeRange, { amount: number; unit: 'h' | 'd' | 'mo' }> = {
@@ -41,7 +40,7 @@ const chartPoints = computed<TimeSeriesPoint[]>(() => {
 
   const timeSpan = points[points.length - 1].timestamp - points[0].timestamp
   const targetBuckets = 150
-  const minBucket = 3600000 // 1 hour minimum
+  const minBucket = 3600000
   const bucketSize = Math.max(minBucket, Math.floor(timeSpan / targetBuckets))
 
   const bucketMap = new Map<number, TimeSeriesPoint>()
@@ -135,18 +134,15 @@ const chartFormatValue = computed(() =>
 )
 
 async function fetchChartData() {
-  chartLoading.value = true
   try {
     const { getUserHistoricStatistics } = await import('@/api/users')
-    const params = timeRangeParams[selectedRange.value]
     chartData.value = await getUserHistoricStatistics(props.userId, {
       category: props.category,
-      ...params,
+      ...timeRangeParams[selectedRange.value],
     })
   } catch {
     chartData.value = []
   }
-  chartLoading.value = false
 }
 
 async function fetchAllTimeData() {
@@ -346,16 +342,6 @@ watch(
   align-items: center;
 }
 
-@media (max-width: 767px) {
-  .xp-breakdown__sources {
-    grid-template-columns: 1fr;
-  }
-
-  .xp-breakdown__tree {
-    display: none;
-  }
-}
-
 .statistics-tab__chart {
   display: flex;
   flex-direction: column;
@@ -370,6 +356,14 @@ watch(
 
   .statistics-tab__prism {
     justify-self: center;
+  }
+
+  .xp-breakdown__sources {
+    grid-template-columns: 1fr;
+  }
+
+  .xp-breakdown__tree {
+    display: none;
   }
 }
 </style>
