@@ -3,6 +3,7 @@ import BaseButton from '@/components/common/BaseButton.vue'
 import BaseTabs from '@/components/common/BaseTabs.vue'
 import SkeletonLoader from '@/components/common/SkeletonLoader.vue'
 import StatBlock from '@/components/common/StatBlock.vue'
+import ApTweaker from '@/components/domain/ApTweaker.vue'
 import ComplexityBadge from '@/components/domain/ComplexityBadge.vue'
 import TimeSeriesChart from '@/components/domain/TimeSeriesChart.vue'
 import { useColorExtract } from '@/composables/useColorExtract'
@@ -71,6 +72,15 @@ const categoryName = computed(() => {
   const info = categoryStore.getCategoryInfo(categoryCode.value)
   return info?.name ?? categoryCode.value
 })
+
+const scoreCurveId = computed(() => categoryStore.byCode.get(categoryCode.value)?.scoreCurve?.id)
+const tweakerOpen = ref(false)
+const tweakerAnchor = ref<HTMLElement | null>(null)
+
+function toggleMapTweaker(event: Event) {
+  tweakerOpen.value = !tweakerOpen.value
+  tweakerAnchor.value = tweakerOpen.value ? (event.currentTarget as HTMLElement) : null
+}
 
 const difficultyTabs = computed(() =>
   rankedDifficulties.value.map((d) => ({
@@ -332,6 +342,19 @@ watch(selectedStatsRange, () => fetchHistoricStats())
               <img src="https://scoresaber.com/favicon-32x32.png" alt="ScoreSaber" width="16" height="16"
                 style="border-radius: 3px;" />
             </BaseButton>
+            <BaseButton v-if="scoreCurveId && activeDifficulty" size="sm" aria-label="AP Tweaker"
+              @click="toggleMapTweaker($event)">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round" />
+                <path
+                  d="M16.2 12.5a1.4 1.4 0 00.28 1.54l.05.05a1.7 1.7 0 11-2.4 2.4l-.05-.05a1.4 1.4 0 00-1.54-.28 1.4 1.4 0 00-.84 1.28v.14a1.7 1.7 0 11-3.4 0v-.07a1.4 1.4 0 00-.92-1.28 1.4 1.4 0 00-1.54.28l-.05.05a1.7 1.7 0 11-2.4-2.4l.05-.05a1.4 1.4 0 00.28-1.54 1.4 1.4 0 00-1.28-.84H2.3a1.7 1.7 0 110-3.4h.07a1.4 1.4 0 001.28-.92 1.4 1.4 0 00-.28-1.54l-.05-.05a1.7 1.7 0 112.4-2.4l.05.05a1.4 1.4 0 001.54.28h.07a1.4 1.4 0 00.84-1.28V2.3a1.7 1.7 0 113.4 0v.07a1.4 1.4 0 00.84 1.28 1.4 1.4 0 001.54-.28l.05-.05a1.7 1.7 0 112.4 2.4l-.05.05a1.4 1.4 0 00-.28 1.54v.07a1.4 1.4 0 001.28.84h.14a1.7 1.7 0 110 3.4h-.07a1.4 1.4 0 00-1.28.84z"
+                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </BaseButton>
+            <ApTweaker v-if="scoreCurveId && activeDifficulty" :open="tweakerOpen" :curve-id="scoreCurveId"
+              :anchor-el="tweakerAnchor" :complexity="activeDifficulty.complexity" :show-weighted="false"
+              @update:open="(val: boolean) => { tweakerOpen = val; if (!val) tweakerAnchor = null }" />
           </div>
 
           <BaseTabs v-if="difficultyTabs.length > 1" :tabs="difficultyTabs" :model-value="activeDifficultyId"

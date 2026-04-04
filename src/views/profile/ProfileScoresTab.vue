@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GlowImage from '@/components/common/GlowImage.vue'
+import ApTweaker from '@/components/domain/ApTweaker.vue'
 import ScoreDetailModal from '@/components/domain/ScoreDetailModal.vue'
 import ScoreTable from '@/components/domain/ScoreTable.vue'
 import { usePageableRoute } from '@/composables/usePageableRoute'
@@ -36,6 +37,32 @@ const scoreData = ref<Page<ScoreResponse> | null>(null)
 
 const detailOpen = ref(false)
 const detailScore = ref<ScoreDisplay | null>(null)
+
+const tweakerOpenId = ref<string | null>(null)
+const tweakerAnchor = ref<HTMLElement | null>(null)
+
+function toggleTweaker(diffId: string, event: Event) {
+  event.preventDefault()
+  event.stopPropagation()
+  if (tweakerOpenId.value === diffId) {
+    tweakerOpenId.value = null
+    tweakerAnchor.value = null
+  } else {
+    tweakerOpenId.value = diffId
+    tweakerAnchor.value = event.currentTarget as HTMLElement
+  }
+}
+
+function getScoreCurveId(categoryCode: string): string | undefined {
+  return categoryStore.byCode.get(categoryCode)?.scoreCurve?.id
+}
+
+function getSiblingAps(categoryCode: string): number[] {
+  return scores.value
+    .filter((s) => s.categoryCode === categoryCode)
+    .map((s) => s.ap)
+    .sort((a, b) => b - a)
+}
 
 const scores = computed<ScoreDisplay[]>(() => {
   if (!scoreData.value) return []
@@ -81,7 +108,7 @@ const allColumns: TableColumn[] = [
   { key: 'mapName', label: 'Map', align: 'left' },
   { key: 'difficulty', label: 'Diff', align: 'center', width: '70px' },
   { key: 'accuracy', label: 'Acc', sortable: true, align: 'right', mono: true, width: '80px' },
-  { key: 'ap', label: 'AP', sortable: true, align: 'right', mono: true, width: '80px' },
+  { key: 'ap', label: 'AP', sortable: true, align: 'right', mono: true, width: '100px' },
   { key: 'weighted', label: 'Weighted', sortable: true, align: 'right', mono: true, width: '80px' },
   { key: 'category', label: 'Category', align: 'center', width: '100px' },
   { key: 'streak115', label: '115s', sortable: true, align: 'right', mono: true, width: '60px' },
@@ -146,22 +173,10 @@ watch(
 
 <template>
   <div class="scores-tab">
-    <ScoreTable
-      :columns="columns"
-      :rows="rows"
-      :sort-state="sortState"
-      :loading="loading"
-      :loading-rows="8"
-      :page="currentPage"
-      :total-pages="totalPages"
-      row-clickable
-      :row-to="scoreRowTo"
-      row-key="mapDifficultyId"
-      :empty-message="props.search ? `No maps matching &quot;${props.search}&quot;` : 'No scores found'"
-      @sort="setSort"
-      @row-click="handleRowClick"
-      @update:page="setPage"
-    >
+    <ScoreTable :columns="columns" :rows="rows" :sort-state="sortState" :loading="loading" :loading-rows="8"
+      :page="currentPage" :total-pages="totalPages" row-clickable :row-to="scoreRowTo" row-key="mapDifficultyId"
+      :empty-message="props.search ? `No maps matching &quot;${props.search}&quot;` : 'No scores found'" @sort="setSort"
+      @row-click="handleRowClick" @update:page="setPage">
       <template #cell-cover="{ row }">
         <GlowImage v-if="row.coverUrl" :src="(row.coverUrl as string)" :alt="(row.mapName as string)" />
       </template>
@@ -169,6 +184,27 @@ watch(
       <template #cell-mapName="{ value }">
         <span class="scores-tab__map-name" :title="(value as string)">
           {{ (value as string).length > 24 ? (value as string).slice(0, 24) + '…' : value }}
+        </span>
+      </template>
+
+      <template #cell-ap="{ row }">
+        <span class="scores-tab__ap-cell" @click.stop.prevent>
+          <span class="scores-tab__ap-value">{{ (row.ap as number).toFixed(2) }}</span>
+          <button class="scores-tab__tweak-btn" aria-label="Tweak AP"
+            @click.stop.prevent="toggleTweaker(row.mapDifficultyId as string, $event)">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+              <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5"
+                stroke-linecap="round" stroke-linejoin="round" />
+              <path
+                d="M16.2 12.5a1.4 1.4 0 00.28 1.54l.05.05a1.7 1.7 0 11-2.4 2.4l-.05-.05a1.4 1.4 0 00-1.54-.28 1.4 1.4 0 00-.84 1.28v.14a1.7 1.7 0 11-3.4 0v-.07a1.4 1.4 0 00-.92-1.28 1.4 1.4 0 00-1.54.28l-.05.05a1.7 1.7 0 11-2.4-2.4l.05-.05a1.4 1.4 0 00.28-1.54 1.4 1.4 0 00-1.28-.84H2.3a1.7 1.7 0 110-3.4h.07a1.4 1.4 0 001.28-.92 1.4 1.4 0 00-.28-1.54l-.05-.05a1.7 1.7 0 112.4-2.4l.05.05a1.4 1.4 0 001.54.28h.07a1.4 1.4 0 00.84-1.28V2.3a1.7 1.7 0 113.4 0v.07a1.4 1.4 0 00.84 1.28 1.4 1.4 0 001.54-.28l.05-.05a1.7 1.7 0 112.4 2.4l-.05.05a1.4 1.4 0 00-.28 1.54v.07a1.4 1.4 0 001.28.84h.14a1.7 1.7 0 110 3.4h-.07a1.4 1.4 0 00-1.28.84z"
+                stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <ApTweaker v-if="getScoreCurveId(row.categoryCode as string)" :open="tweakerOpenId === row.mapDifficultyId"
+            :accuracy="(row.accuracy as number)" :ap="(row.ap as number)" :weighted-ap="(row.weighted as number)"
+            :curve-id="getScoreCurveId(row.categoryCode as string)!" :anchor-el="tweakerAnchor"
+            :sibling-aps="getSiblingAps(row.categoryCode as string)"
+            @update:open="(val: boolean) => { tweakerOpenId = val ? (row.mapDifficultyId as string) : null; if (!val) tweakerAnchor = null }" />
         </span>
       </template>
 
@@ -254,6 +290,37 @@ watch(
 
 .scores-tab__streak--empty {
   color: var(--text-tertiary);
+}
+
+.scores-tab__ap-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.scores-tab__ap-value {
+  font-weight: 500;
+}
+
+.scores-tab__tweak-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: color 120ms ease;
+}
+
+.scores-tab__tweak-btn:hover {
+  color: var(--accent, var(--text-primary));
 }
 
 .scores-tab__detail-btn {
